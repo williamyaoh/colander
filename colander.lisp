@@ -156,6 +156,39 @@
                       (all-of #'opt-spec-p #'verify-opt-spec))
               spec)))
 
+(defun take (n list)
+  "Collect N elements from the front of LIST. Second return value is the
+   rest of the list after stopping."
+  (do* ((list list (cdr list))
+        (element (car list) (car list))
+        (i 0 (1+ i))
+        (acc '() (cons element acc)))
+       ((or (null list) (= i n))
+        (values (nreverse acc) list))))
+
+(defun drop (n list)
+  "Remove N elements from the front of LIST."
+  (multiple-value-bind (front back) (take n list)
+    (declare (ignore front))
+    back))
+
+(defun take-if (fn list)
+  "Collect elements from the front of LIST, until finding one which does
+   not satisfy the predicate FN. Second return value is the rest of the
+   list after stopping."
+  (do* ((list list (cdr list))
+        (acc '() (cons element acc))
+        (element (car list) (car list)))
+       ((or (null list) (not (funcall fn element)))
+        (values (nreverse acc) list))))
+
+(defun drop-if (fn list)
+  "Remove elements from LIST until finding one which does not
+   satisfy the predicate FN."
+  (multiple-value-bind (outside collected) (take-if fn list)
+    (declare (ignore outside))
+    collected))
+
 (defun fold-spec (spec)
   "Take a single specification, fold together all the adjacent options."
   )
