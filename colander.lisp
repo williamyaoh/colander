@@ -121,6 +121,41 @@
       (all-of #'stringp (complement #'opt-p)))
 (setf (symbol-function 'designator-spec-p) #'symbolp)
 
+(defun segregate-binary (list fn)
+  "Like SEGREGATE, but only takes a single predicate FN, and the primary
+   return value is simply all elements which satisfied FN."
+  (labels ((segregate-binary* (remain collect outside)
+             (if (null remain)
+                 (values (nreverse collect) (nreverse outside))
+                 (if (funcall fn (car remain))
+                     (segregate-binary* (cdr remain) (cons (car remain) collect) outside)
+                     (segregate-binary* (cdr remain) collect (cons (car remain) outside))))))
+    (segregate-binary* list '() '())))
+
+(defun segregate (list &rest fns)
+  "Take a list of predicates FNS, return a list of lists consisting of
+   the elements which satisfied each FN. Each FN is expected to be
+   disjoint from all the others, and SEGREGATE will return a *partition*
+   of the original list. If they're not disjoint, an element which satisfies
+   multiple predicates will only be placed in the list of the leftmost FN.
+
+   Secondary return value is a list of all elements which failed to satisfy
+   any predicate."
+  (labels ((segregate* (remain collect fns)
+             (if (null fns)
+                 (values (nreverse collect) remain)
+                 (multiple-value-bind (collect* remain*)
+                     (segregate-binary remain (car fns))
+                   (segregate* remain* (cons collect* collect) (rest fns))))))
+    (segregate* list '() fns)))
+
+(defun verify-spec (spec)
+  (and (listp spec)
+       (every (one-of #'arg-spec-p
+                      #'designator-spec-p
+                      (all-of #'opt-spec-p #'verify-opt-spec))
+              spec)))
+
 (defun fold-spec (spec)
   "Take a single specification, fold together all the adjacent options."
   )
