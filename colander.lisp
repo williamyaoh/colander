@@ -114,6 +114,13 @@
                                 (subseq x 1)))))
                       (rest opt-spec))))))
 
+(defun opt-spec-p (obj)
+  (and (consp obj)
+       (member (car obj) '(:opt :arg :opts))))
+(setf (symbol-function 'arg-spec-p)
+      (all-of #'stringp (complement #'opt-p)))
+(setf (symbol-function 'designator-spec-p) #'symbolp)
+
 (defun fold-spec (spec)
   "Take a single specification, fold together all the adjacent options."
   )
