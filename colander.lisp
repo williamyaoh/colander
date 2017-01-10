@@ -205,6 +205,5 @@
                       (recur (rest spec) (cons spec* acc)))
                      ((opt-spec-p spec*)
                       (multiple-value-bind (opts rest) (take-if #'opt-spec-p spec)
-                        (recur rest
-                               (cons (mappend #'explode-opt-spec opts) acc)))))))))
+                        (recur rest (cons (mappend #'explode-opt-spec opts) acc)))))))))
     (recur spec '())))
