@@ -4,4 +4,5 @@
   :maintainer "William Yao <williamyaoh@gmail.com>"
   :version "0.0.1"
   :components ((:file "packages")
+               (:file "defschema" :depends-on ("packages"))
                (:file "colander" :depends-on ("packages"))))
