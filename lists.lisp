@@ -69,6 +69,6 @@
 
 
 (defun suffixes (list)
-  "All non-empty suffixes of list. Includes itself."
+  "All non-empty suffixes of LIST. Includes itself."
   (loop for suffixes on list collect suffixes))
 
