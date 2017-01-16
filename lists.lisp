@@ -71,4 +71,3 @@
 (defun suffixes (list)
   "All non-empty suffixes of LIST. Includes itself."
   (loop for suffixes on list collect suffixes))
-
