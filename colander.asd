@@ -4,5 +4,12 @@
   :maintainer "William Yao <williamyaoh@gmail.com>"
   :version "0.0.1"
   :components ((:file "packages")
-               (:file "defschema" :depends-on ("packages"))
-               (:file "colander" :depends-on ("packages"))))
+               (:file "lists" :depends-on ("packages"))
+               (:file "composition" :depends-on ("packages"))
+               (:module "utils"
+                  :pathname ""
+                  :depends-on ("packages")
+                  :components ((:file "lists")
+                               (:file "composition")))
+               (:file "defschema" :depends-on ("packages" "utils"))
+               (:file "colander" :depends-on ("packages" "utils" "defschema"))))
