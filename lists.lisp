@@ -70,9 +70,5 @@
 
 (defun suffixes (list)
   "All non-empty suffixes of list. Includes itself."
-  (labels ((recur (list suffixes)
-             (if (null list)
-                 (nreverse suffixes)
-                 (recur (cdr list) (cons list suffixes)))))
-    (recur list '())))
+  (loop for suffixes on list collect suffixes))
 
