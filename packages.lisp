@@ -25,4 +25,5 @@
 (defpackage #:colander
   (:use #:cl
         #:colander/utils
-        #:colander/defschema))
+        #:colander/defschema
+        #:iterate))
