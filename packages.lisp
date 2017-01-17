@@ -11,7 +11,10 @@
            #:mappend
 
            #:suffixes
-
+
+           #:flatten
+           #:group
+
            #:one-of #:all-of))
 
 (defpackage #:colander/defschema

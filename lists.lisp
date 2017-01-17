@@ -71,3 +71,17 @@
 (defun suffixes (list)
   "All non-empty suffixes of LIST. Includes itself."
   (loop for suffixes on list collect suffixes))
+
+
+(defun flatten (list)
+  (mappend (lambda (x) (if (listp x) (flatten x) (list x)))
+           list))
+
+(defun group (n source)
+  (if (zerop n) (error "zero length"))
+  (labels ((rec (source acc)
+             (let ((rest (nthcdr n source)))
+               (if (consp rest)
+                   (rec rest (cons (subseq source 0 n) acc))
+                   (nreverse (cons source acc))))))
+    (if source (rec source nil) nil)))
