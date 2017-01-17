@@ -15,7 +15,9 @@
            #:flatten
            #:group
 
-           #:one-of #:all-of))
+           #:one-of #:all-of
+
+           #:partial))
 
 (defpackage #:colander/defschema
   (:use #:cl

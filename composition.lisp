@@ -11,3 +11,8 @@
     (and (every (lambda (f) (funcall f x))
                 (cons fn fns))
          x)))
+
+
+(defun partial (fn &rest args)
+  (lambda (&rest args*)
+    (apply fn (append args args*))))
