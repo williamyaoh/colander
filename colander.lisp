@@ -205,5 +205,5 @@
                                    (designators head))))))
             (finish))
            (group
-            (appending (destructure `(&rest ,head) (group (tee (length head)) list*)))
+            (appending (destructure `(&rest ,head) (group (length head) list*)))
             (finish))))))))
