@@ -143,4 +143,67 @@
     (recur spec '())))
 
 
+(defun &symbolp (symb)
+  (and (symbolp symb)
+       (string= (symbol-name symb) "&" :end1 1)))
 
+(defun designators (dlist)
+  (remove-if #'&symbolp (flatten dlist)))
+
+(defun merge-values% (values1 values2)
+  (map 'list
+       (lambda (value1 value2)
+         `(,(first value2)
+           ,(max (second value1) (second value2))
+           ,(cons (third value2) (third value1))))
+       values1
+       values2))
+
+(defun tee (obj)
+  "For debugging."
+  (format *error-output* "~S~%" obj)
+  obj)
+
+;; Structure of a value: (KEY NEST VALUE)
+;;   where NEST indicates levels nesting within &REST, &BODY, &GROUP forms.
+;;   NEST of 0 indicates singular value.
+(defun destructure (dlist list &optional (nest 0))
+  (iter
+    (with state = 'positional)
+    (with list* = list)
+    (when (null list*) (finish))
+    (let ((head (pop dlist)))
+      (case head
+        (&whole (setf state 'whole))
+        ((&rest &body) (setf state 'rest))
+        (&group (setf state 'group))
+        (otherwise
+         (ecase state
+           (whole (collecting `(,head ,nest ,list))
+            (setf state 'positional))
+           (positional
+            (let ((element (pop list*)))
+              (if (listp element)
+                  (appending (destructure head element nest))
+                  (collecting `(,head ,nest ,element)))))
+           (rest
+            (if (not (listp head))
+                (collecting `(,head ,(1+ nest) ,list*))
+                (appending
+                 (map 'list
+                      (lambda (value)
+                        `(,(first value)
+                          ,(1+ (second value))
+                          ,(nreverse (third value))))
+                      (reduce #'merge-values%
+                              (map 'list
+                                   (lambda (l) (destructure head l nest))
+                                   list*)
+                              :initial-value
+                              (map 'list
+                                   (lambda (key) `(,key ,nest ()))
+                                   (designators head))))))
+            (finish))
+           (group
+            (appending (destructure `(&rest ,head) (group (tee (length head)) list*)))
+            (finish))))))))
