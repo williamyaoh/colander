@@ -1,5 +1,8 @@
 (in-package #:colander/utils)
 
+(defun holdp (list) (not (null list)))
+
+
 (defun take (n list)
   "Collect N elements from the front of LIST. Second return value is the
    rest of the list after stopping."

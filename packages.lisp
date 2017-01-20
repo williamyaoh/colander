@@ -2,7 +2,9 @@
 
 (defpackage #:colander/utils
   (:use #:cl)
-  (:export #:take #:take-if
+  (:export #:holdp
+
+           #:take #:take-if
            #:drop #:drop-if
 
            #:segregate-binary
