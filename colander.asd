@@ -3,7 +3,7 @@
   :author "William Yao <williamyaoh@gmail.com>"
   :maintainer "William Yao <williamyaoh@gmail.com>"
   :version "0.0.1"
-  :depends-on ("iterate")
+  :depends-on ("iterate" "alexandria")
   :components ((:file "packages")
                (:file "lists" :depends-on ("packages"))
                (:file "composition" :depends-on ("packages"))
