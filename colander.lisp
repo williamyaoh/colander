@@ -167,18 +167,21 @@
            `((,next
               ,(intern-nfa-state
                 (make-instance 'nfa-normal-parse-node :datum (cdr datum))))))
-          (null `((nil ,(intern-nfa-state (make-instance 'nfa-accept-node)))))
+          (null `((accept ,(intern-nfa-state (make-instance 'nfa-accept-node)))))
           (cons
-           (iter (for opt-spec in next)
-                 (if (not (opt-arg? opt-spec))
-                     (collecting `(,opt-spec ,(nfa-node-id node)))
-                     (progn (collecting `(,(make-instance 'opt-arg-spec :opt-spec opt-spec)
-                                          ,(nfa-node-id node)))
-                            (collecting `(,opt-spec
-                                          ,(intern-nfa-state
-                                            (make-instance 'nfa-parse-arg-node
-                                                           :datum opt-spec
-                                                           :previous (nfa-node-id node)))))))))))))
+           (cons
+            `(nil ,(intern-nfa-state
+                    (make-instance 'nfa-normal-parse-node :datum (cdr datum))))
+            (iter (for opt-spec in next)
+                  (if (not (opt-arg? opt-spec))
+                      (collecting `(,opt-spec ,(nfa-node-id node)))
+                      (progn (collecting `(,(make-instance 'opt-arg-spec :opt-spec opt-spec)
+                                            ,(nfa-node-id node)))
+                             (collecting `(,opt-spec
+                                           ,(intern-nfa-state
+                                             (make-instance 'nfa-parse-arg-node
+                                                            :datum opt-spec
+                                                            :previous (nfa-node-id node))))))))))))))
 (defmethod compute-transitions% ((node nfa-parse-arg-node))
   ;; We got here from an OPT-SPEC that has an arg, so the only outgoing edge
   ;; should be if we get an argument.
@@ -194,5 +197,31 @@
       (des-spec `((,next ,(intern-nfa-state
                            (make-instance 'nfa-arg-only-node
                                           :datum (drop-if #'listp (cdr datum)))))))
-      (null `((nil ,(intern-nfa-state (make-instance 'nfa-accept-node))))))))
+      (null `((accept ,(intern-nfa-state (make-instance 'nfa-accept-node))))))))
 (defmethod compute-transitions% ((node nfa-accept-node)) '())
+
+
+;; DFA.
+
+(defun epsilon-closure (state)
+  (cons state (iter (for transition in (nfa-node-transitions state))
+                    (when (null (nfa-transition-edge transition))
+                      (appending
+                       (epsilon-closure (lookup-state (nfa-transition-out transition))))))))
+
+;; (defgeneric same-spec (obj1 obj2)
+;;   (:method (obj1 obj2) nil))
+
+;; (defmethod same-spec ((obj1 arg-spec) (obj2 arg-spec))
+;;   (eq (arg-name obj1) (arg-name obj2)))
+;; (defmethod same-spec ((obj1 des-spec) (obj2 des-spec))
+;;   (eq (des-string obj1) (des-string obj2)))
+;; (defmethod same-spec ((obj1 opt-spec) (obj2 opt-spec))
+;;   (string= (opt-short obj1) (opt-short obj2)))
+;; (defmethod same-spec ((obj1 opt-arg-spec) (obj2 opt-arg-spec))
+;;   (same-spec (contained-opt-spec obj1) (contained-opt-spec obj2)))
+
+;; We need a list of every single *unique* transition (excluding epsilons)
+;; and their corresponding NFA state numbers.
+(defun dfa-transitions (closure)
+  )
