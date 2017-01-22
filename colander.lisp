@@ -61,9 +61,9 @@
 (defvar *nfa*)
 (defvar *nfa-computed-transitions*)
 
-(defclass nfa-transition ()
-  ((edge :accessor nfa-transition-edge :initarg :edge)
-   (out :accessor nfa-transition-out :initarg :out)))
+(defclass transition ()
+  ((edge :accessor transition-edge :initarg :edge)
+   (out :accessor transition-out :initarg :out)))
 (defclass nfa-node ()
   ((id :accessor nfa-node-id :initarg :id)
    (datum :accessor nfa-node-datum :initarg :datum)
@@ -124,14 +124,14 @@
     (intern-nfa-state root-node)
     (setf (nfa-root *nfa*) root-node)
     (iter (for spec in specs)
-          (push (make-instance 'nfa-transition
+          (push (make-instance 'transition
                                :edge nil
                                :out (intern-nfa-state
                                      (make-instance 'nfa-normal-parse-node
                                                     :datum spec)))
                 (nfa-node-transitions root-node)))
     (iter (for transition in (nfa-node-transitions root-node))
-          (spec-compute-transitions-nfa (nfa-transition-out transition)))
+          (spec-compute-transitions-nfa (transition-out transition)))
     *nfa*))
 
 (defun spec-compute-transitions-nfa (state)
@@ -140,7 +140,7 @@
     (let* ((node (aref (nfa-lookup *nfa*) state))
            (transitions (compute-transitions% node)))
       (iter (for (edge state) in transitions)
-            (push (make-instance 'nfa-transition :edge edge :out state)
+            (push (make-instance 'transition :edge edge :out state)
                   (nfa-node-transitions node)))
       (iter (for (edge state) in transitions)
             (spec-compute-transitions-nfa state)))))
@@ -205,23 +205,14 @@
 
 (defun epsilon-closure (state)
   (cons state (iter (for transition in (nfa-node-transitions state))
-                    (when (null (nfa-transition-edge transition))
+                    (when (null (transition-edge transition))
                       (appending
-                       (epsilon-closure (lookup-state (nfa-transition-out transition))))))))
+                       (epsilon-closure (lookup-state (transition-out transition))))))))
 
-;; (defgeneric same-spec (obj1 obj2)
-;;   (:method (obj1 obj2) nil))
-
-;; (defmethod same-spec ((obj1 arg-spec) (obj2 arg-spec))
-;;   (eq (arg-name obj1) (arg-name obj2)))
-;; (defmethod same-spec ((obj1 des-spec) (obj2 des-spec))
-;;   (eq (des-string obj1) (des-string obj2)))
-;; (defmethod same-spec ((obj1 opt-spec) (obj2 opt-spec))
-;;   (string= (opt-short obj1) (opt-short obj2)))
-;; (defmethod same-spec ((obj1 opt-arg-spec) (obj2 opt-arg-spec))
-;;   (same-spec (contained-opt-spec obj1) (contained-opt-spec obj2)))
-
-;; We need a list of every single *unique* transition (excluding epsilons)
-;; and their corresponding NFA state numbers.
-(defun dfa-transitions (closure)
-  )
+(defclass dfa-node ()
+  ((arg-ts :accessor dfa-node-arg-ts :initarg :arg-ts :initform nil)
+   (des-ts :accessor dfa-node-des-ts :initarg :des-ts :initform nil)
+   (dd-t :accessor dfa-node-dd-t :initarg :dd-t :initform nil)
+   (accept-t :accessor dfa-node-accept-t :initarg :accept-t :initform nil)
+   (opt-ts :accessor dfa-node-opt-ts :initarg :opt-ts :initform nil)
+   (opt-arg-ts :accessor dfa-node-opt-arg-ts :initarg :opt-arg-ts :initform nil)))
