@@ -209,6 +209,9 @@
                       (appending
                        (epsilon-closure (lookup-state (transition-out transition))))))))
 
+(defun epsilon-closures (states)
+  (iter (for state in states) (unioning (epsilon-closure state))))
+
 (defclass dfa-node ()
   ((arg-ts :accessor dfa-node-arg-ts :initarg :arg-ts :initform nil)
    (des-ts :accessor dfa-node-des-ts :initarg :des-ts :initform nil)
