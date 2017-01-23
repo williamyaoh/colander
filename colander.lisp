@@ -297,7 +297,9 @@
         (with double-dash = nil)
         (if (not double-dash)
             (cond
-              ((string= arg "--") (setf double-dash t))
+              ((string= arg "--")
+               (setf double-dash t)
+               (collecting arg))
               ((not (funcall (one-of #'opt-p #'included-arg-opt-p) arg))
                (collecting arg))
               (:otherwise (appending (fully-expand-args arg))))
