@@ -219,3 +219,86 @@
    (accept-t :accessor dfa-node-accept-t :initarg :accept-t :initform nil)
    (opt-ts :accessor dfa-node-opt-ts :initarg :opt-ts :initform nil)
    (opt-arg-ts :accessor dfa-node-opt-arg-ts :initarg :opt-arg-ts :initform nil)))
+
+
+;; Actual strings.
+
+(defmacro alias (name fn)
+  "Set the SYMBOL-FUNCTION of NAME correctly. FN should be a form
+   which evaluates to a function."
+  `(progn
+     (declaim (ftype function ,name))
+     (setf (symbol-function ',name) ,fn)
+     ',name))
+
+(alias alpha-number-p #'alphanumericp)
+(alias identifier-char-p (one-of #'alpha-number-p (lambda (c) (find c "-_"))))
+
+(defun long-opt-p (str)
+  (and (stringp str)
+       (> (length str) 2)
+       (string= "--" str :end2 2)
+       (every #'identifier-char-p (subseq str 2))
+       str))
+
+(defun short-opt-p (str)
+  (and (stringp str)
+       (= (length str) 2)
+       (char= (char str 0) #\-)
+       (alpha-number-p (char str 1))
+       str))
+
+(defun combined-short-opt-p (str)
+  (and (stringp str)
+       (> (length str) 2)
+       (char= (char str 0) #\-)
+       (every #'alpha-number-p (subseq str 1))
+       str))
+
+(alias single-opt-p (one-of #'long-opt-p #'short-opt-p))
+(alias opt-p (one-of #'single-opt-p #'combined-short-opt-p))
+
+(defun included-arg-opt-p (str)
+  (when (stringp str)
+    (let ((equal (position #\= str)))
+      (when equal
+        (and (not (zerop (length (subseq str (1+ equal)))))
+             (opt-p (subseq str 0 equal)))))))
+
+(defun included-arg (str)
+  "Extract the included argument in the option; return them if found, NIL
+   if not."
+  (when (included-arg-opt-p str)
+    (let ((equal (position #\= str)))
+      (if (funcall #'opt-p (subseq str 0 equal))
+          (values (subseq str (1+ equal))
+                  (subseq str 0 equal))
+          (values nil nil)))))
+
+(defun expand-short (opt)
+  (iter (for char in-vector (subseq opt 1))
+        (collecting (format nil "-~C" char))))
+
+(defun maybe-expand (opt)
+  (if (long-opt-p opt)
+      (list opt)
+      (expand-short opt)))
+
+(defun fully-expand-args (arg)
+  "Return a list containing the embedded args (for example, '-abc=blah' gets
+   expanded into (-a -b -c blah))"
+  (multiple-value-bind (arg* opt*) (included-arg arg)
+    (if arg*
+        (append (maybe-expand opt*) (list arg*))
+        (maybe-expand arg))))
+
+(defun normalize-args (args)
+  (iter (for arg in args)
+        (with double-dash = nil)
+        (if (not double-dash)
+            (cond
+              ((string= arg "--") (setf double-dash t))
+              ((not (funcall (one-of #'opt-p #'included-arg-opt-p) arg))
+               (collecting arg))
+              (:otherwise (appending (fully-expand-args arg))))
+            (collecting arg))))
