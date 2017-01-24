@@ -417,7 +417,7 @@
             append (fully-expand-args arg)
           end
         else
-          collecting arg
+          collect arg
         end))
 
 (defun symb (&rest objs)
