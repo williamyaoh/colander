@@ -316,25 +316,166 @@
 
 ;; Generating code.
 
+(defun reintern-to-package (form &optional (package *package*))
+  (typecase form
+    (cons (map 'list (lambda (form) (reintern-to-package form package)) form))
+    (symbol (if (or (keywordp form) (not (symbol-package form)))
+                form
+                (intern (symbol-name form) package)))
+    (otherwise form)))
+
+(defgeneric generate-code (code-name &rest args))
+
+(defmacro defcode (name (&rest code-fn-args) &body body)
+  "BDDY should return some Lisp code; DEFCODE provides a generic function to
+   automatically reintern said code in a different package."
+  (let ((code-name (gensym "CODE-NAME"))
+        (inner-args (gensym "ARGS")))
+    `(defmethod generate-code ((,code-name (eql ',name)) &rest ,inner-args)
+       (destructuring-bind ,code-fn-args ,inner-args
+         (reintern-to-package
+          (progn ,@body))))))
+
+(defmacro defcodefn! (name (&rest args) &body body)
+  "Used for defining functions which are useful both in the current package
+   and for generating somewhere else."
+  `(progn (defcode ,name () '(defun ,name ,args ,@body))
+          (eval (generate-code ',name))))
+
+(defcodefn! identifier-char-p (char)
+  (or (alphanumericp char) (find char "-_")))
+
+(defcodefn! short-opt-p (str)
+  (and (stringp str)
+       (= (length str) 2)
+       (char= (char str 0) #\-)
+       (alphanumericp (char str 1))
+       str))
+
+(defcodefn! long-opt-p (str)
+  (and (stringp str)
+       (> (length str) 2)
+       (string= str "--" :end1 2)
+       (every #'identifier-char-p (subseq str 2))
+       str))
+
+(defcodefn! combined-short-opt-p (str)
+  (and (stringp str)
+       (> (length str) 2)
+       (char= (char str 0) #\-)
+       (every #'alphanumericp (subseq str 1))
+       str))
+
+(defcodefn! single-opt-p (str)
+  (or (short-opt-p str) (long-opt-p str)))
+
+(defcodefn! opt-p (str)
+  (or (single-opt-p str) (combined-short-opt-p str)))
+
+(defcodefn! included-arg-opt-p (str)
+  (when (stringp str)
+    (let ((equal (position #\= str)))
+      (when equal
+        (and (not (zerop (length (subseq str (1+ equal)))))
+             (opt-p (subseq str 0 equal)))))))
+
+(defcodefn! included-arg (str)
+  "Extract the included argument in the option; return them if found, NIL
+   if not."
+  (when (included-arg-opt-p str)
+    (let ((equal (position #\= str)))
+      (if (funcall #'opt-p (subseq str 0 equal))
+          (values (subseq str (1+ equal))
+                  (subseq str 0 equal))
+          (values nil nil)))))
+
+(defcodefn! expand-short (opt)
+  (loop for char across (subseq opt 1)
+        collect (format nil "-~C" char)))
+
+(defcodefn! maybe-expand (opt)
+  (if (long-opt-p opt)
+      (list opt)
+      (expand-short opt)))
+
+(defcodefn! fully-expand-args (arg)
+  (multiple-value-bind (arg* opt*) (included-arg arg)
+    (if arg*
+        (append (maybe-expand opt*) (list arg*))
+        (maybe-expand arg))))
+
+(defcodefn! normalize-args (args)
+  (loop for arg in args
+        with double-dash = nil
+        if (not double-dash)
+          if (string= arg "--")
+            do (setf double-dash t)
+            and collect arg
+          else if (not (or (opt-p arg) (included-arg-opt-p arg)))
+            collect arg
+          else
+            append (fully-expand-args arg)
+          end
+        else
+          collecting arg
+        end))
+
 (defun symb (&rest objs)
   (intern (string-upcase (with-output-to-string (s)
                            (format s "~{~A~}" objs)))))
 
-(defun state-code (node &optional (package *package*))
+(defun node-state-symbol (node)
+  (symb "state" (dfa-node-id node)))
+
+(defmacro with-runtime-symbs ((&rest symbs) &body body)
+  `(let ,(mapcar (lambda (symb) `(,symb (symb ,(symbol-name symb)))) symbs)
+     ,@body))
+
+(defun arg-processing-fns-code ()
+  (with-runtime-symbs (str char short-opt-p long-opt-p identifier-char-p)
+    (list `(defun ,identifier-char-p (,char)
+             (or (alphanumericp ,char)
+                 (member ,char "-_")))
+          `(defun ,short-opt-p (,str)
+             (and (stringp ,str)
+                  (= (length ,str) 2)
+                  (string= ,str "-" :end1 1)
+                  (alphanumericp (char ,str 1))
+                  ,str))
+          `(defun ,long-opt-p (,str)
+             (and (stringp ,str)
+                  (> (length ,str) 2)
+                  (string= ,str "--" :end1 2)
+                  (every (function ,identifier-char-p) ,str))))))
+
+(defun normalize-args-code ()
+  (with-runtime-symbs (normalize-args tokens )
+    `(defun ,normalize-args (,tokens)
+       (loop ))))
+
+(defun driver-code (dfa)
+  (with-runtime-symbs (token tokens state state* parse-driver)
+    `(defun ,parse-driver (,tokens)
+       (loop for ,token in ,tokens
+             with ,state = (function ,(node-state-symbol (dfa-root dfa)))
+             do (let ((,state* (funcall ,state ,token)))
+                  (etypecase ,state*
+                    (function (setf ,state ,state*))
+                    (list (return ,state*))))))))
+
+(defun state-code (node)
   "Generate the code for a single DFA state's parsing function. PACKAGE
    determines in which package the symbols in the generated code will come
    from."
-  (let* ((*package* package)
-         (token (symb "token"))
-         (state-name (symb "state" (dfa-node-id node))))
-    `(defun ,state-name (,token)
+  (let* ((token (symb "token")))
+    `(defun ,(node-state-symbol node) (,token)
        (cond
          ,@(when (dfa-node-accept-t node)
-             `(((null ,token) ,(transition-out (dfa-node-accept-t node)))))
+             `(((null ,token) (function ,(node-state-symbol (dfa-lookup-state (transition-out (dfa-node-accept-t node))))))))
          ,@(when (dfa-node-dd-t node)
-             `(((string= ,token "--") ,(transition-out (dfa-node-dd-t node)))))
+             `(((string= ,token "--") (function ,(node-state-symbol (dfa-lookup-state (transition-out (dfa-node-dd-t node))))))))
          ;; Put stuff here zzz...
-         ))))
+             ))))
 
 
 ;; Actual strings.
