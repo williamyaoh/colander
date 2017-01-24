@@ -55,9 +55,6 @@
 
 ;; NFA, and NFA-to-DFA translations.
 
-(defclass opt-arg-spec ()
-  ((opt-spec :accessor contained-opt-spec :initarg :opt-spec)))
-
 (defvar *nfa*)
 (defvar *nfa-computed-transitions*)
 
@@ -175,13 +172,11 @@
             (iter (for opt-spec in next)
                   (if (not (opt-arg? opt-spec))
                       (collecting `(,opt-spec ,(nfa-node-id node)))
-                      (progn (collecting `(,(make-instance 'opt-arg-spec :opt-spec opt-spec)
-                                            ,(nfa-node-id node)))
-                             (collecting `(,opt-spec
-                                           ,(intern-nfa-state
-                                             (make-instance 'nfa-parse-arg-node
-                                                            :datum opt-spec
-                                                            :previous (nfa-node-id node))))))))))))))
+                      (collecting `(,opt-spec
+                                    ,(intern-nfa-state
+                                      (make-instance 'nfa-parse-arg-node
+                                                     :datum opt-spec
+                                                     :previous (nfa-node-id node)))))))))))))
 (defmethod compute-transitions% ((node nfa-parse-arg-node))
   ;; We got here from an OPT-SPEC that has an arg, so the only outgoing edge
   ;; should be if we get an argument.
@@ -213,12 +208,115 @@
   (iter (for state in states) (unioning (epsilon-closure state))))
 
 (defclass dfa-node ()
-  ((arg-ts :accessor dfa-node-arg-ts :initarg :arg-ts :initform nil)
+  ((node-id :accessor dfa-node-id :initarg :node-id)
+   (datum :accessor dfa-node-datum :initarg :datum)
+   (arg-t :accessor dfa-node-arg-t :initarg :arg-t :initform nil)
    (des-ts :accessor dfa-node-des-ts :initarg :des-ts :initform nil)
    (dd-t :accessor dfa-node-dd-t :initarg :dd-t :initform nil)
    (accept-t :accessor dfa-node-accept-t :initarg :accept-t :initform nil)
-   (opt-ts :accessor dfa-node-opt-ts :initarg :opt-ts :initform nil)
-   (opt-arg-ts :accessor dfa-node-opt-arg-ts :initarg :opt-arg-ts :initform nil)))
+   (opt-ts :accessor dfa-node-opt-ts :initarg :opt-ts :initform nil)))
+
+(defmethod same-state ((obj1 dfa-node) (obj2 dfa-node))
+  (and (subsetp (dfa-node-datum obj1) (dfa-node-datum obj2) :key #'nfa-node-id)
+       (subsetp (dfa-node-datum obj2) (dfa-node-datum obj1) :key #'nfa-node-id)))
+
+(defclass dfa ()
+  ((root :accessor dfa-root :initarg :root)
+   (lookup :accessor dfa-lookup :initarg :lookup
+           :initform (make-array 5 :adjustable t :fill-pointer 0))))
+
+(defvar *dfa*)
+(defvar *dfa-computed-transitions*)
+
+(defun nfa-to-dfa (nfa)
+  (let ((*nfa* nfa)
+        (*dfa* (make-instance 'dfa))
+        (*dfa-computed-transitions* (make-hash-table))
+        (root (make-instance 'dfa-node)))
+    (setf (dfa-root *dfa*) root
+          (dfa-node-datum root) (list (nfa-root *nfa*)))
+    (intern-dfa-state root)
+    (dfa-calculate-transitions (dfa-node-id root))
+    *dfa*))
+
+(defun dfa-lookup-state (state)
+  (aref (dfa-lookup *dfa*) state))
+
+(defun intern-dfa-state (node)
+  (let ((old-state (iter (for id index-of-vector (dfa-lookup *dfa*))
+                         (finding id such-that (same-state node (dfa-lookup-state id))))))
+    (if old-state
+        old-state
+        (setf (dfa-node-id node) (vector-push-extend node (dfa-lookup *dfa*))))))
+
+(defun dfa-node-all-transitions (node)
+  (list* (dfa-node-arg-t node)
+         (dfa-node-dd-t node)
+         (dfa-node-accept-t node)
+         (append (dfa-node-des-ts node)
+                 (dfa-node-opt-ts node))))
+
+(defun dfa-calculate-transitions (state)
+  (unless (gethash state *dfa-computed-transitions*)
+    (setf (gethash state *dfa-computed-transitions*) t)
+    (let* ((node (dfa-lookup-state state))
+           (closure (epsilon-closures (dfa-node-datum node)))
+           (arg-t '())
+           (des-ts (make-hash-table :test 'equal))
+           (dd-t '())
+           (accept-t '())
+           (opt-ts (make-hash-table :test 'equal)))
+      (setf (dfa-node-datum node) closure)
+      (iter (for nfa-node in closure)
+            (iter (for transition in (nfa-node-transitions nfa-node))
+                  (let ((edge (transition-edge transition)))
+                    (etypecase edge
+                      (arg-spec (setf arg-t (adjoin (transition-out transition)
+                                                    arg-t)))
+                      (des-spec (setf (gethash des-ts (des-string edge))
+                                      (adjoin (transition-out transition)
+                                              (gethash des-ts (des-string edge) '()))))
+                      (opt-spec (setf (gethash opt-ts (opt-short edge))
+                                      (adjoin (transition-out transition)
+                                              (gethash opt-ts (opt-short edge) '()))))
+                      (symbol
+                       (ecase edge
+                         (double-dash (setf dd-t (adjoin (transition-out transition)
+                                                         dd-t)))
+                         (accept (setf accept-t (adjoin (transition-out transition)
+                                                        accept-t)))))))))
+      ;; Generate our next states...
+      (setf (dfa-node-arg-t node)
+            (make-instance 'transition
+                           :edge (make-instance 'arg-spec)
+                           :out (intern-dfa-state (make-instance 'dfa-node :datum (map 'list #'lookup-state arg-t)))))
+      (maphash (lambda (des states)
+                 (push (make-instance 'transition
+                                      :edge (make-instance 'des-spec :string des)
+                                      :out (intern-dfa-state (make-instance 'dfa-node :datum (map 'list #'lookup-state states))))
+                       (dfa-node-des-ts node)))
+               des-ts)
+      (setf (dfa-node-dd-t node)
+            (make-instance 'transition
+                           :edge 'double-dash
+                           :out (intern-dfa-state (make-instance 'dfa-node :datum (map 'list #'lookup-state dd-t)))))
+      (setf (dfa-node-accept-t node)
+            (make-instance 'transition
+                           :edge 'accept
+                           :out (intern-dfa-state (make-instance 'dfa-node :datum (map 'list #'lookup-state accept-t)))))
+      (maphash (lambda (opt states)
+                 (push (make-instance 'transition
+                                      :edge (make-instance 'opt-spec :short opt)
+                                      :out (intern-dfa-state (make-instance 'dfa-node :datum (map 'list #'lookup-state states))))
+                       (dfa-node-opt-ts node)))
+               opt-ts)
+      (iter (for transition in (dfa-node-all-transitions node))
+            (dfa-calculate-transitions (transition-out transition))))))
+
+
+;; Generating code.
+
+
 
 
 ;; Actual strings.
