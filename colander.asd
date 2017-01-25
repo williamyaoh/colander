@@ -13,4 +13,14 @@
                   :components ((:file "lists")
                                (:file "composition")))
                (:file "defschema" :depends-on ("packages" "utils"))
-               (:file "colander" :depends-on ("packages" "utils" "defschema"))))
+               (:file "colander" :depends-on ("packages" "utils" "defschema")))
+  :in-order-to ((test-op (test-op "colander/test"))))
+
+(defsystem #:colander/test
+  :author "William Yao <williamyaoh@gmail.com>"
+  :maintainer "William Yao <williamyaoh@gmail.com>"
+  :version "0.0.1"
+  :depends-on ("colander" "fiveam")
+  :components ()
+  :perform (test-op (o s)
+                    nil))
