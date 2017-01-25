@@ -243,6 +243,7 @@
   (aref (dfa-lookup *dfa*) state))
 
 (defun intern-dfa-state (node)
+  (setf (dfa-node-datum node) (epsilon-closures (dfa-node-datum node)))
   (let ((old-state (iter (for id index-of-vector (dfa-lookup *dfa*))
                          (finding id such-that (same-state node (dfa-lookup-state id))))))
     (if old-state
@@ -260,31 +261,31 @@
   (unless (gethash state *dfa-computed-transitions*)
     (setf (gethash state *dfa-computed-transitions*) t)
     (let* ((node (dfa-lookup-state state))
-           (closure (epsilon-closures (dfa-node-datum node)))
            (arg-t '())
            (des-ts (make-hash-table :test 'equal))
            (dd-t '())
            (accept-t '())
            (opt-ts (make-hash-table :test 'equal)))
       (setf (dfa-node-datum node) closure)
-      (iter (for nfa-node in closure)
+      (iter (for nfa-node in (dfa-node-datum node))
             (iter (for transition in (nfa-node-transitions nfa-node))
                   (let ((edge (transition-edge transition)))
-                    (etypecase edge
-                      (arg-spec (setf arg-t (adjoin (transition-out transition)
-                                                    arg-t)))
-                      (des-spec (setf (gethash des-ts (des-string edge))
-                                      (adjoin (transition-out transition)
-                                              (gethash des-ts (des-string edge) '()))))
-                      (opt-spec (setf (gethash opt-ts (opt-short edge))
-                                      (adjoin (transition-out transition)
-                                              (gethash opt-ts (opt-short edge) '()))))
-                      (symbol
-                       (ecase edge
-                         (double-dash (setf dd-t (adjoin (transition-out transition)
-                                                         dd-t)))
-                         (accept (setf accept-t (adjoin (transition-out transition)
-                                                        accept-t)))))))))
+                    (when edge
+                      (etypecase edge
+                        (arg-spec (setf arg-t (adjoin (transition-out transition)
+                                                      arg-t)))
+                        (des-spec (setf (gethash (des-string edge) des-ts)
+                                        (adjoin (transition-out transition)
+                                                (gethash (des-string edge) des-ts '()))))
+                        (opt-spec (setf (gethash (opt-short edge) opt-ts)
+                                        (adjoin (transition-out transition)
+                                                (gethash (opt-short edge) opt-ts '()))))
+                        (symbol
+                         (ecase edge
+                           (double-dash (setf dd-t (adjoin (transition-out transition)
+                                                           dd-t)))
+                           (accept (setf accept-t (adjoin (transition-out transition)
+                                                          accept-t))))))))))
       ;; Generate our next states...
       (setf (dfa-node-arg-t node)
             (make-instance 'transition
@@ -421,143 +422,38 @@
         end))
 
 (defun symb (&rest objs)
-  (intern (string-upcase (with-output-to-string (s)
-                           (format s "~{~A~}" objs)))))
+  (intern (string-upcase (with-output-to-string (s) (format s "~{~A~}" objs)))))
 
-(defun node-state-symbol (node)
-  (symb "state" (dfa-node-id node)))
+(defcode dfa-state-symbol (node)
+  (symb "state" (if (numberp node) node (dfa-node-id node))))
 
-(defmacro with-runtime-symbs ((&rest symbs) &body body)
-  `(let ,(mapcar (lambda (symb) `(,symb (symb ,(symbol-name symb)))) symbs)
-     ,@body))
+(defcode arg-parse-driver (dfa)
+  `(defun arg-parse-driver (tokens)
+     (let ((state (function ,(generate-code 'dfa-state-symbol (dfa-root dfa)))))
+       (dolist (token tokens)
+         (setf state (funcall state token)))
+       (funcall state nil))))
 
-(defun arg-processing-fns-code ()
-  (with-runtime-symbs (str char short-opt-p long-opt-p identifier-char-p)
-    (list `(defun ,identifier-char-p (,char)
-             (or (alphanumericp ,char)
-                 (member ,char "-_")))
-          `(defun ,short-opt-p (,str)
-             (and (stringp ,str)
-                  (= (length ,str) 2)
-                  (string= ,str "-" :end1 1)
-                  (alphanumericp (char ,str 1))
-                  ,str))
-          `(defun ,long-opt-p (,str)
-             (and (stringp ,str)
-                  (> (length ,str) 2)
-                  (string= ,str "--" :end1 2)
-                  (every (function ,identifier-char-p) ,str))))))
-
-(defun normalize-args-code ()
-  (with-runtime-symbs (normalize-args tokens )
-    `(defun ,normalize-args (,tokens)
-       (loop ))))
-
-(defun driver-code (dfa)
-  (with-runtime-symbs (token tokens state state* parse-driver)
-    `(defun ,parse-driver (,tokens)
-       (loop for ,token in ,tokens
-             with ,state = (function ,(node-state-symbol (dfa-root dfa)))
-             do (let ((,state* (funcall ,state ,token)))
-                  (etypecase ,state*
-                    (function (setf ,state ,state*))
-                    (list (return ,state*))))))))
-
-(defun state-code (node)
-  "Generate the code for a single DFA state's parsing function. PACKAGE
-   determines in which package the symbols in the generated code will come
-   from."
-  (let* ((token (symb "token")))
-    `(defun ,(node-state-symbol node) (,token)
-       (cond
-         ,@(when (dfa-node-accept-t node)
-             `(((null ,token) (function ,(node-state-symbol (dfa-lookup-state (transition-out (dfa-node-accept-t node))))))))
-         ,@(when (dfa-node-dd-t node)
-             `(((string= ,token "--") (function ,(node-state-symbol (dfa-lookup-state (transition-out (dfa-node-dd-t node))))))))
-         ;; Put stuff here zzz...
-             ))))
-
-
-;; Actual strings.
-
-(defmacro alias (name fn)
-  "Set the SYMBOL-FUNCTION of NAME correctly. FN should be a form
-   which evaluates to a function."
-  `(progn
-     (declaim (ftype function ,name))
-     (setf (symbol-function ',name) ,fn)
-     ',name))
-
-(alias alpha-number-p #'alphanumericp)
-(alias identifier-char-p (one-of #'alpha-number-p (lambda (c) (find c "-_"))))
-
-(defun long-opt-p (str)
-  (and (stringp str)
-       (> (length str) 2)
-       (string= "--" str :end2 2)
-       (every #'identifier-char-p (subseq str 2))
-       str))
-
-(defun short-opt-p (str)
-  (and (stringp str)
-       (= (length str) 2)
-       (char= (char str 0) #\-)
-       (alpha-number-p (char str 1))
-       str))
-
-(defun combined-short-opt-p (str)
-  (and (stringp str)
-       (> (length str) 2)
-       (char= (char str 0) #\-)
-       (every #'alpha-number-p (subseq str 1))
-       str))
-
-(alias single-opt-p (one-of #'long-opt-p #'short-opt-p))
-(alias opt-p (one-of #'single-opt-p #'combined-short-opt-p))
-
-(defun included-arg-opt-p (str)
-  (when (stringp str)
-    (let ((equal (position #\= str)))
-      (when equal
-        (and (not (zerop (length (subseq str (1+ equal)))))
-             (opt-p (subseq str 0 equal)))))))
-
-(defun included-arg (str)
-  "Extract the included argument in the option; return them if found, NIL
-   if not."
-  (when (included-arg-opt-p str)
-    (let ((equal (position #\= str)))
-      (if (funcall #'opt-p (subseq str 0 equal))
-          (values (subseq str (1+ equal))
-                  (subseq str 0 equal))
-          (values nil nil)))))
-
-(defun expand-short (opt)
-  (iter (for char in-vector (subseq opt 1))
-        (collecting (format nil "-~C" char))))
-
-(defun maybe-expand (opt)
-  (if (long-opt-p opt)
-      (list opt)
-      (expand-short opt)))
-
-(defun fully-expand-args (arg)
-  "Return a list containing the embedded args (for example, '-abc=blah' gets
-   expanded into (-a -b -c blah))"
-  (multiple-value-bind (arg* opt*) (included-arg arg)
-    (if arg*
-        (append (maybe-expand opt*) (list arg*))
-        (maybe-expand arg))))
-
-(defun normalize-args (args)
-  (iter (for arg in args)
-        (with double-dash = nil)
-        (if (not double-dash)
-            (cond
-              ((string= arg "--")
-               (setf double-dash t)
-               (collecting arg))
-              ((not (funcall (one-of #'opt-p #'included-arg-opt-p) arg))
-               (collecting arg))
-              (:otherwise (appending (fully-expand-args arg))))
-            (collecting arg))))
+(defcode dfa-state (node)
+  `(defun ,(generate-code 'dfa-state-symbol node) (token)
+     (cond
+       ,@(when (dfa-node-dd-t node)
+           `(((string= "--" token)
+              (function
+               ,(generate-code 'dfa-state-symbol (transition-out (dfa-node-dd-t node)))))))
+       ,@(when (dfa-node-accept-t node)
+           `(((null token)
+              ,(dfa-node-id node))))
+       ,@(iter (for transition in (dfa-node-des-ts node))
+               (collecting
+                `((string= token ,(des-string (transition-edge transition)))
+                  (function ,(generate-code 'dfa-state-symbol (transition-out transition))))))
+       ,@(when (dfa-node-arg-t node)
+           `(((not (or (short-opt-p token) (long-opt-p token)))
+              (function
+               ,(generate-code 'dfa-state-symbol (transition-out (dfa-node-arg-t node)))))))
+       ,@(iter (for transition in (dfa-node-opt-ts node))
+               (collecting
+                `((string= token ,(opt-short (transition-edge transition)))
+                  (function ,(generate-code 'dfa-state-symbol (transition-out transition))))))
+       (:otherwise (error "no transition")))))
