@@ -31,17 +31,29 @@
        | (VAR-NAME SLOT-NAME)
 
    SLOT-NAME, VAR-NAME ::= SYMBOL"
+  (let ((specs (map 'list #'normalize-slot-spec slot-specs)))
+    ;; WITH-NESTED-SLOTS% expands recursively, so we do sanity-checking
+    ;; on the slot specifications once, at the top-level.
+    (labels ((var-names (specs)
+               (when specs
+                 (iter (for ((var-name slot-name) children) in specs)
+                       (collecting var-name)
+                       (appending (var-names children))))))
+      (when (not (equal (var-names specs) (remove-duplicates (var-names specs))))
+        (error "A variable name occurs more than once in WITH-NESTED-SLOTS."))
+      `(with-nested-slots% ,specs ,obj ,@body))))
+
+(defmacro with-nested-slots% ((&rest slot-specs) obj &body body)
   (if (null slot-specs)
       `(progn ,obj ,@body)
-      (let ((specs (map 'list #'normalize-slot-spec slot-specs)))
-        (labels ((1layer-slots (specs)
-                   (if (null specs)
-                       `(progn ,@body)
-                       (destructuring-bind ((var-name slot-name) children) (first specs)
-                         (declare (ignorable slot-name))
-                         `(with-nested-slots ,children ,var-name
-                            ,(1layer-slots (rest specs)))))))
-          `(with-slots ,(iter (for ((var-name slot-name) children) in specs)
-                              (collecting (list var-name slot-name)))
-               ,obj
-             ,(1layer-slots specs))))))
+      (labels ((1layer-slots (specs)
+                 (if (null specs)
+                     `(progn ,@body)
+                     (destructuring-bind ((var-name slot-name) children) (first specs)
+                       (declare (ignorable slot-name))
+                       `(with-nested-slots% ,children ,var-name
+                          ,(1layer-slots (rest specs)))))))
+        `(with-slots ,(iter (for ((var-name slot-name) children) in slot-specs)
+                            (collecting (list var-name slot-name)))
+             ,obj
+           ,(1layer-slots slot-specs)))))
