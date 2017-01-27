@@ -1,18 +1,91 @@
 (in-package #:colander)
 
-;; Firstly, a standard syntax for our specifications.
+(defgeneric generate-code (code-name &rest args))
 
-(defclass arg-spec ()
-  ((name :accessor arg-name :initarg :name)
-   (many? :accessor arg-many? :initarg :many? :initform nil)))
-(defclass des-spec ()
-  ((string :accessor des-string :initarg :string)))
-(defclass opt-spec ()
-  ((name :accessor opt-name :initarg :name)
-   (short :accessor opt-short :initarg :short)
-   (arg? :accessor opt-arg? :initarg :arg? :initform nil)
-   (arg-name :accessor opt-arg-name :initarg :arg-name :initform nil)
-   (many? :accessor opt-many? :initarg :many? :initform nil)))
+(defmethod generate-code ((code-name (eql 'reintern-to-package)) &rest args)
+  (declare (ignorable args))
+  `(defun reintern-to-package (form &optional (package *package*))
+     (typecase form
+       (cons (map 'list (lambda (form) (reintern-to-package form package)) form))
+       (symbol (if (or (keywordp form) (not (symbol-package form)))
+                   form
+                   (intern (symbol-name form) package)))
+       (otherwise form))))
+
+(eval (generate-code 'reintern-to-package))
+
+(defmacro defcode (name (&rest code-fn-args) &body body)
+  "BDDY should return some Lisp code; DEFCODE provides a generic function to
+   automatically reintern said code in a different package."
+  (let ((code-name (gensym "CODE-NAME"))
+        (inner-args (gensym "ARGS")))
+    `(defmethod generate-code ((,code-name (eql ',name)) &rest ,inner-args)
+       (destructuring-bind ,code-fn-args ,inner-args
+         (reintern-to-package
+          (progn ,@body))))))
+
+(defmacro defcode! (name &body body)
+  "Used for defining code that's useful both in the current package
+   and for generating somewhere else."
+  `(progn (defcode ,name () ,@body)
+          (eval (generate-code ',name))))
+
+(defmacro defcodefn! (name (&rest args) &body body)
+  "Used for defining functions which are useful both in the current package
+   and for generating somewhere else."
+  `(defcode! ,name '(defun ,name ,args ,@body)))
+
+;; Firstly, a standard syntax for our specifications.
+;; This syntax needs to be readable, because we need to be able
+;; to copy it into our generated parser...
+
+(defcode! arg-spec
+  `(defclass arg-spec ()
+     ((name :accessor arg-name :initarg :name)
+      (many? :accessor arg-many? :initarg :many? :initform nil))))
+(defcode! des-spec
+  `(defclass des-spec ()
+     ((string :accessor des-string :initarg :string))))
+(defcode! opt-spec
+  `(defclass opt-spec ()
+     ((name :accessor opt-name :initarg :name)
+      (short :accessor opt-short :initarg :short)
+      (arg? :accessor opt-arg? :initarg :arg? :initform nil)
+      (arg-name :accessor opt-arg-name :initarg :arg-name :initform nil)
+      (many? :accessor opt-many? :initarg :many? :initform nil))))
+
+(defcode! arg-spec-load-form
+  `(defmethod make-load-form ((obj arg-spec) &optional environment)
+     (declare (ignorable environment))
+     ;; Due to backquote not having a consistent internal representation
+     ;; across implementations, this template has to be written manually...
+     (reintern-to-package
+      (list 'make-instance (list 'quote (type-of obj))
+            :name (arg-name obj)
+            :many? (arg-many? obj)))))
+(defcode! des-spec-load-form
+  `(defmethod make-load-form ((obj des-spec) &optional environment)
+     (declare (ignorable environment))
+     (reintern-to-package
+      (list 'make-instance (list 'quote (type-of obj))
+            :string (des-string obj)))))
+(defcode! opt-spec-load-form
+  `(defmethod make-load-form ((obj opt-spec) &optional environment)
+     (declare (ignorable environment))
+     (reintern-to-package
+      (list 'make-instance (list 'quote (type-of obj))
+            :name (opt-name obj)
+            :short (opt-short obj)
+            :arg? (opt-arg? obj)
+            :arg-name (opt-arg-name obj)
+            :many? (opt-many? obj)))))
+
+(defmethod print-object ((obj arg-spec) stream)
+  (format stream "~S" (make-load-form obj)))
+(defmethod print-object ((obj des-spec) stream)
+  (format stream "~S" (make-load-form obj)))
+(defmethod print-object ((obj opt-spec) stream)
+  (format stream "~S" (make-load-form obj)))
 
 (defun arg-spec-list-p% (obj) (symbolp obj))
 (defun des-spec-list-p% (obj) (stringp obj))
@@ -323,32 +396,6 @@
 
 ;; Generating code.
 
-(defun reintern-to-package (form &optional (package *package*))
-  (typecase form
-    (cons (map 'list (lambda (form) (reintern-to-package form package)) form))
-    (symbol (if (or (keywordp form) (not (symbol-package form)))
-                form
-                (intern (symbol-name form) package)))
-    (otherwise form)))
-
-(defgeneric generate-code (code-name &rest args))
-
-(defmacro defcode (name (&rest code-fn-args) &body body)
-  "BDDY should return some Lisp code; DEFCODE provides a generic function to
-   automatically reintern said code in a different package."
-  (let ((code-name (gensym "CODE-NAME"))
-        (inner-args (gensym "ARGS")))
-    `(defmethod generate-code ((,code-name (eql ',name)) &rest ,inner-args)
-       (destructuring-bind ,code-fn-args ,inner-args
-         (reintern-to-package
-          (progn ,@body))))))
-
-(defmacro defcodefn! (name (&rest args) &body body)
-  "Used for defining functions which are useful both in the current package
-   and for generating somewhere else."
-  `(progn (defcode ,name () '(defun ,name ,args ,@body))
-          (eval (generate-code ',name))))
-
 (defcodefn! identifier-char-p (char)
   (or (alphanumericp char) (find char "-_")))
 
@@ -442,6 +489,7 @@
 
 (defcode dfa-state (node)
   `(defun ,(generate-code 'dfa-state-symbol node) (token)
+     (declare (ignorable token))
      (cond
        ,@(when (dfa-node-dd-t node)
            `(((string= "--" token)
@@ -462,4 +510,4 @@
                (collecting
                 `((string= token ,(opt-short (transition-edge transition)))
                   (function ,(generate-code 'dfa-state-symbol (transition-out transition))))))
-       (:otherwise (error "no transition")))))
+       (:otherwise (error "no transition from state ~A" ,(dfa-node-id node))))))
