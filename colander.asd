@@ -10,7 +10,8 @@
                (:module "utils"
                   :pathname ""
                   :depends-on ("packages")
-                  :components ((:file "lists")
+                  :components ((:file "slots")
+                               (:file "lists")
                                (:file "composition")))
                (:file "defschema" :depends-on ("packages" "utils"))
                (:file "colander" :depends-on ("packages" "utils" "defschema")))

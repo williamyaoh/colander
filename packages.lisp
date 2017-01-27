@@ -1,8 +1,11 @@
 (in-package #:cl-user)
 
 (defpackage #:colander/utils
-  (:use #:cl)
-  (:export #:holdp
+  (:use #:cl
+        #:iterate)
+  (:export #:with-nested-slots
+
+           #:holdp
 
            #:take #:take-if
            #:drop #:drop-if
