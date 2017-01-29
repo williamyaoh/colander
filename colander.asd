@@ -1,4 +1,3 @@
-(in-package #:asdf)
 (defsystem #:colander
   :author "William Yao <williamyaoh@gmail.com>"
   :maintainer "William Yao <williamyaoh@gmail.com>"
