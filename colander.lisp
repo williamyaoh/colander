@@ -2,6 +2,8 @@
 
 (defgeneric generate-code (code-name &rest args))
 
+;; We use REINTERN-TO-PACKAGE within the definition of DEFCODE below,
+;; but we also need it in our output code.
 (defmethod generate-code ((code-name (eql 'reintern-to-package)) &rest args)
   (declare (ignorable args))
   `(defun reintern-to-package (form &optional (package *package*))
@@ -126,10 +128,25 @@
                (setf spec left)))))))
 
 
-;; NFA, and NFA-to-DFA translations.
+;; NFA.
 
 (defvar *nfa*)
 (defvar *nfa-computed-transitions*)
+
+(defclass production ()
+  ((cli-spec :initarg :cli-spec)))
+(defclass item ()
+  ((prod-id :initarg :prod-id)
+   (dot :initarg dot)))
+
+(defun item-advance (item)
+  (with-slots (dot) item
+    (incf dot)))
+(defun item-prod (item)
+  (lookup-prod (slot-value item 'prod-id)))
+(defun item-at-dot (item)
+  (with-slots (dot) item
+    (nth dot (item-prod item))))
 
 (defclass transition ()
   ((edge :accessor transition-edge :initarg :edge)
