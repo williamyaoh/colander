@@ -22,7 +22,9 @@
 
            #:one-of #:all-of
 
-           #:partial))
+           #:partial
+
+           #:slurp #:spit))
 
 (defpackage #:colander/defschema
   (:use #:cl

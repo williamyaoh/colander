@@ -16,6 +16,10 @@
 
 (eval (generate-code 'reintern-to-package))
 
+(defmethod generate-code :around ((code-name (eql 'reintern-to-package)) &rest args)
+  (declare (ignorable args))
+  (reintern-to-package (call-next-method)))
+
 (defmacro defcode (name (&rest code-fn-args) &body body)
   "BDDY should return some Lisp code; DEFCODE provides a generic function to
    automatically reintern said code in a different package."
@@ -528,3 +532,60 @@
                 `((string= token ,(opt-short (transition-edge transition)))
                   (function ,(generate-code 'dfa-state-symbol (transition-out transition))))))
        (:otherwise (error "no transition from state ~A" ,(dfa-node-id node))))))
+
+
+;; All the code we need in a given package.
+
+(defun generate-parser-forms (dfa &optional (package *package*))
+  (let ((*package* package)
+        (noarg-code (list 'arg-spec
+                          'des-spec
+                          'opt-spec
+                          'arg-spec-load-form
+                          'des-spec-load-form
+                          'opt-spec-load-form
+
+                          'reintern-to-package
+                          'identifier-char-p
+                          'short-opt-p
+                          'long-opt-p
+                          'combined-short-opt-p
+                          'single-opt-p
+                          'opt-p
+                          'included-arg-opt-p
+                          'included-arg
+                          'expand-short
+                          'maybe-expand
+                          'fully-expand-args
+                          'normalize-args)))
+    `(progn
+       ,@(iter (for symbol in noarg-code)
+               (collecting (generate-code symbol)))
+       ,@(iter (for node in-vector (dfa-lookup dfa))
+               (collecting (generate-code 'dfa-state node)))
+       ,(generate-code 'arg-parse-driver dfa))))
+
+(defun generate-copyable-parser (dfa)
+  "The point of this parser is to be text that gets copied into another file --
+   for example, a standalone script."
+  ;; We do the form generation in one package, and the printing in another.
+  ;; We don't want FORMAT to print symbols while it itself is in the parser's
+  ;; package.
+  (let ((forms (let ((*package* (make-package "COLANDER/PARSER" :use '(#:cl))))
+                 (list `(defpackage #:colander/parser
+                          (:use #:cl)
+                          (:export #:parse))
+                       (reintern-to-package
+                        `(eval-when (:compile-toplevel :load-toplevel :execute)
+                           (setf old-package *package*)))
+                       (reintern-to-package
+                        `(in-package #:colander/parser))
+                       (generate-parser-forms dfa)
+                       (reintern-to-package
+                        `(eval-when (:compile-toplevel :load-toplevel :execute)
+                           (setf *package* old-package)))))))
+    (prog1 (with-output-to-string (out)
+             (let ((*package* (make-package "COLANDER/BLANK" :use '())))
+               (format out "~{~S~^~%~}" forms)))
+      (delete-package "COLANDER/PARSER")
+      (delete-package "COLANDER/BLANK"))))

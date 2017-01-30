@@ -7,13 +7,19 @@
                (:file "lists" :depends-on ("packages"))
                (:file "composition" :depends-on ("packages"))
                (:module "utils"
-                  :pathname ""
-                  :depends-on ("packages")
-                  :components ((:file "slots")
-                               (:file "lists")
-                               (:file "composition")))
+                :pathname ""
+                :depends-on ("packages")
+                :components ((:file "slots")
+                             (:file "lists")
+                             (:file "composition")
+                             (:file "files")))
+               (:module "sexps"
+                :components ((:static-file "argv.sexp")))
                (:file "defschema" :depends-on ("packages" "utils"))
-               (:file "colander" :depends-on ("packages" "utils" "defschema")))
+               (:file "colander" :depends-on ("packages"
+                                              "utils"
+                                              "defschema"
+                                              "sexps")))
   :in-order-to ((test-op (test-op "colander/test"))))
 
 (defsystem #:colander/test
