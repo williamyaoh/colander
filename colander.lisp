@@ -527,7 +527,7 @@
                 `((string= token ,(des-string (transition-edge transition)))
                   (function ,(generate-code 'dfa-state-symbol (transition-out transition))))))
        ,@(when (dfa-node-arg-t node)
-           `(((not (or (short-opt-p token) (long-opt-p token)))
+           `(((and (stringp token) (not (short-opt-p token)) (not (long-opt-p token)))
               (function
                ,(generate-code 'dfa-state-symbol (transition-out (dfa-node-arg-t node)))))))
        ,@(iter (for transition in (dfa-node-opt-ts node))
