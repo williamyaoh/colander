@@ -26,13 +26,23 @@
 
            #:slurp #:spit))
 
-(defpackage #:colander/defschema
+(defpackage #:colander/finite-automata
   (:use #:cl
-        #:colander/utils)
-  (:export #:defschema))
+        #:iterate)
+  (:export #:node #:id #:datum #:edges
+           #:edge #:label #:out
+           #:finite-automaton #:root #:nodes
+
+           #:generate-finite-automaton
+           #:generate-root-node
+           #:effect-transitions-recursively
+           #:effect-transitions
+           #:generate-transitions
+           #:intern-node
+           #:same-state-p))
 
 (defpackage #:colander
   (:use #:cl
         #:colander/utils
-        #:colander/defschema
+        #:colander/finite-automata
         #:iterate))

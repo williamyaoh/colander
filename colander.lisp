@@ -132,25 +132,127 @@
                (setf spec left)))))))
 
 
-;; NFA.
 
-(defvar *nfa*)
-(defvar *nfa-computed-transitions*)
+(defclass nfa (fa) ())
+
+(defclass nfa-node (node) ())
+(defclass nfa-start-node (nfa-node) ())
+(defclass nfa-normal-node (nfa-node) ())
+(defclass nfa-opt-arg-parse-node (nfa-node)
+  ((opt-spec :initarg :opt-spec)))
+(defclass nfa-dd-node (nfa-node) ())
+
+(defun next-cli-spec (nfa-node)
+  (with-slots (datum) nfa-node
+    (item-at-dot datum)))
+(defun node-advance (nfa-node)
+  (with-slots ((item datum)) nfa-node
+    (setf item (item-advance item))))
+
+(defmethod generate-root-node ((fa-type (eql 'nfa)) cli-specs)
+  (make-instance 'nfa-start-node :datum cli-specs))
+
+(defmethod generate-transitions ((node nfa-start-node) cli-specs)
+  (declare (ignore cli-specs))
+  (with-slots ((cli-specs datum)) node
+    (iter (for i index-of-vector cli-specs)
+          (collecting `(nil ,(make-instance
+                              'nfa-normal-node
+                              :datum (make-instance
+                                      'item
+                                      :prod-id i
+                                      :dot 0)))))))
+
+(defmethod generate-transitions ((node nfa-normal-node) cli-specs)
+  (declare (ignore cli-specs))
+  (with-slots ((item datum)) node
+    `((double-dash ,(make-instance 'nfa-dd-node :datum item))
+      ,@(let ((next (next-cli-spec node)))
+          (etypecase next
+            (arg-spec `((,next (make-instance 'nfa-normal-node :datum (item-advance item)))))
+            (des-spec `((,next (make-instance 'nfa-normal-node :datum (item-advance item)))))
+            (null `((accept accept)))
+            (cons `((nil ,(make-instance 'nfa-normal-node :datum (item-advance item)))
+                    ,@(iter (for opt-spec in next)
+                            (if (not (opt-arg? opt-spec))
+                                (collecting `(,opt-spec ,node))
+                                (collecting `(,opt-spec ,(make-instance
+                                                          'nfa-opt-arg-parse-node
+                                                          :opt-spec ,opt-spec
+                                                          :datum item))))))))))))
+
+(defmethod generate-transitions ((node nfa-opt-arg-parse-node) cli-specs)
+  (declare (ignore cli-specs))
+  (with-slots ((previous datum) opt-spec) node
+    (list `(,(make-instance 'arg-spec :name (opt-arg-name opt-spec))
+            ,(make-instance 'nfa-normal-node :datum previous)))))
+
+(defmethod generate-transitions ((node nfa-dd-node) cli-specs)
+  (declare (ignore cli-specs))
+  (let ((next (next-cli-spec node)))
+    (list (with-slots ((item datum)) node
+            (etypecase next
+              (arg-spec `(,next (make-instance 'nfa-dd-node :datum (item-advance item))))
+              (des-spec `(,next (make-instance 'nfa-dd-node :datum (item-advance item))))
+              (null `(accept accept)))))))
+
+(defmethod same-state ((node1 nfa-normal-node) (node2 nfa-normal-node))
+  (similar-p (slot-value node1 'datum) (slot-value node2 'datum)))
+(defmethod same-state ((node1 nfa-opt-arg-parse-node) (node2 nfa-opt-arg-parse-node))
+  (and (similar-p (slot-value node1 'opt-spec) (slot-value node2 'opt-spec))
+       (similar-p (slot-value node1 'datum) (slot-value node2 'datum))))
+(defmethod same-state ((node1 nfa-dd-node) (node2 nfa-dd-node))
+  (similar-p (slot-value node1 'datum) (slot-value node2 'datum)))
+
+(defmethod intern-node :around ((fa-node nfa-dd-node) fa)
+  (with-slots (datum) fa-node
+    (iter (while (listp (next-cli-spec fa-node)))
+          (node-advance fa-node))
+    (call-next-method fa-node fa)))
 
 (defclass production ()
   ((cli-spec :initarg :cli-spec)))
+
 (defclass item ()
   ((prod-id :initarg :prod-id)
    (dot :initarg dot)))
-
 (defun item-advance (item)
-  (with-slots (dot) item
-    (incf dot)))
+  (with-slots (dot prod-id) item
+    (make-instance 'item :prod-id prod-id :dot (1+ dot))))
+
 (defun item-prod (item)
   (lookup-prod (slot-value item 'prod-id)))
 (defun item-at-dot (item)
   (with-slots (dot) item
     (nth dot (item-prod item))))
+
+(defgeneric similar-p (obj1 obj2)
+  (:documentation
+   "I don't know why EQUAL isn't a generic function.")
+  (:method (obj1 obj2)
+    (declare (ignore obj1 obj2))
+    nil))
+
+(defmethod similar-p ((obj1 item) (obj2 item))
+  (and (= (slot-value obj1 'prod-id) (slot-value obj2 'prod-id))
+       (= (slot-value obj1 'dot) (slot-value obj2 'dot))))
+
+(defmethod similar-p ((obj1 arg-spec) (obj2 arg-spec))
+  (eq (arg-name obj1) (arg-name obj2)))
+
+(defmethod similar-p ((obj1 des-spec) (obj2 des-spec))
+  (string= (des-string obj1) (des-string obj2)))
+
+(defmethod similar-p ((obj1 opt-spec) (obj2 opt-spec))
+  ;; This will need to get rewritten after adding more functionality to
+  ;; our options.
+  (and (string= (opt-short obj1) (opt-short obj2))
+       (not (alexandria:xor (opt-arg? obj1) (opt-arg? obj2)))))
+
+
+;; -----
+(defvar *nfa*)
+(defvar *nfa-computed-transitions*)
 
 (defclass transition ()
   ((edge :accessor transition-edge :initarg :edge)
