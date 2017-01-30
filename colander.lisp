@@ -508,6 +508,9 @@
          (setf state (funcall state token)))
        (funcall state nil))))
 
+(defcode dfa-state-declaim (node)
+  `(declaim (ftype function ,(generate-code 'dfa-state-symbol node))))
+
 (defcode dfa-state (node)
   `(defun ,(generate-code 'dfa-state-symbol node) (token)
      (declare (ignorable token))
@@ -538,14 +541,15 @@
 
 (defun generate-parser-forms (dfa &optional (package *package*))
   (let ((*package* package)
-        (noarg-code (list 'arg-spec
+        (noarg-code (list 'reintern-to-package
+
+                          'arg-spec
                           'des-spec
                           'opt-spec
                           'arg-spec-load-form
                           'des-spec-load-form
                           'opt-spec-load-form
 
-                          'reintern-to-package
                           'identifier-char-p
                           'short-opt-p
                           'long-opt-p
@@ -562,6 +566,8 @@
        ,@(iter (for symbol in noarg-code)
                (collecting (generate-code symbol)))
        ,@(iter (for node in-vector (dfa-lookup dfa))
+               (collecting (generate-code 'dfa-state-declaim node)))
+       ,@(iter (for node in-vector (dfa-lookup dfa))
                (collecting (generate-code 'dfa-state node)))
        ,(generate-code 'arg-parse-driver dfa))))
 
@@ -575,6 +581,8 @@
                  (list `(defpackage #:colander/parser
                           (:use #:cl)
                           (:export #:parse))
+                       (reintern-to-package
+                        `(defvar old-package))
                        (reintern-to-package
                         `(eval-when (:compile-toplevel :load-toplevel :execute)
                            (setf old-package *package*)))
