@@ -12,14 +12,28 @@
                              (:file "composition")
                              (:file "files")
                              (:file "evaluation")))
+               (:file "code-generation" :depends-on ("packages" "utils"))
+               (:file "similar-p" :depends-on ("packages"))
+               (:file "op-specs" :depends-on ("packages"
+                                              "utils"
+                                              "similar-p"))
                (:module "sexps"
                 :components ((:static-file "argv.sexp")))
-               (:file "code-generation" :depends-on ("packages" "utils"))
-               (:file "finite-automata" :depends-on ("packages"))
+               (:module "automata"
+                :pathname ""
+                :depends-on ("packages" "similar-p")
+                :components ((:file "finite-automata")
+                             (:file "productions")))
+               (:file "nfa" :depends-on ("packages"
+                                         "automata"
+                                         "similar-p"
+                                         "op-specs"))
                (:file "colander" :depends-on ("packages"
                                               "utils"
                                               "code-generation"
-                                              "finite-automata"
+                                              "op-specs"
+                                              "automata"
+                                              "nfa"
                                               "sexps")))
   :in-order-to ((test-op (test-op "colander/test"))))
 

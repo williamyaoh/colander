@@ -7,6 +7,9 @@
       Core of our parser generator; allows us to emit code without dependencies
       to parse command line options.")))
 
+(defmacro generate-and-load (code-name &rest args)
+  (apply #'generate-code code-name args))
+
 ;; We use REINTERN-TO-PACKAGE within the definition of DEFCODE below,
 ;; but we also need it in our output code.
 (eval-now
@@ -20,7 +23,7 @@
                      (intern (symbol-name form) package)))
          (otherwise form))))
 
-  (eval (generate-code 'reintern-to-package))
+  (generate-and-load reintern-to-package)
 
   (defmethod generate-code :around ((code-name (eql 'reintern-to-package)) &rest args)
     (declare (ignorable args))
@@ -41,7 +44,7 @@
    and for generating somewhere else. BODY must be evaluable at compile time."
   `(eval-now
      (defcode ,name () ,@body)
-     (eval (generate-code ',name))))
+     (generate-and-load ,name)))
 
 (defmacro defcodefn! (name (&rest args) &body body)
   "Used for defining functions which are useful both in the current package
