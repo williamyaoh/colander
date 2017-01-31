@@ -56,7 +56,7 @@
     (with-slots (edges) fa-node
       (iter (for edge in edges)
             (with-slots (out) edge
-              (unless (eq out 'accept)
+              (unless (eq out :accept)
                 (effect-transitions-recursively out fa seed computed)))))))
 
 (defgeneric effect-transitions (fa-node fa seed)
@@ -68,8 +68,8 @@
             (push (make-instance
                    'edge
                    :label label
-                   :out (if (eq out 'accept)
-                            'accept
+                   :out (if (eq out :accept)
+                            :accept
                             (intern-node out fa seed)))
                   edges)))))
 

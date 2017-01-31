@@ -32,12 +32,12 @@
 
 (defmethod generate-transitions ((node nfa-normal-node) prods)
   (with-slots ((item datum)) node
-    `((double-dash ,(make-instance 'nfa-dd-node :datum item))
+    `((:double-dash ,(make-instance 'nfa-dd-node :datum item))
       ,@(let ((next (next-cli-spec node prods)))
           (etypecase next
             (arg-spec `((,next ,(make-instance 'nfa-normal-node :datum (item-advance item)))))
             (des-spec `((,next ,(make-instance 'nfa-normal-node :datum (item-advance item)))))
-            (null `((accept accept)))
+            (null `((:accept :accept)))
             (cons `((nil ,(make-instance 'nfa-normal-node :datum (item-advance item)))
                     ,@(iter (for opt-spec in next)
                             (if (not (opt-arg? opt-spec))
@@ -59,7 +59,7 @@
             (etypecase next
               (arg-spec `(,next ,(make-instance 'nfa-dd-node :datum (item-advance item))))
               (des-spec `(,next ,(make-instance 'nfa-dd-node :datum (item-advance item))))
-              (null `(accept accept)))))))
+              (null `(:accept :accept)))))))
 
 (defmethod same-state-p ((node1 nfa-normal-node) (node2 nfa-normal-node))
   (similar-p (slot-value node1 'datum) (slot-value node2 'datum)))

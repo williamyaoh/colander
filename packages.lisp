@@ -70,8 +70,6 @@
            #:edge #:label #:out
            #:finite-automaton #:root #:nodes
 
-           #:accept
-
            #:generate-finite-automaton
            #:generate-root-node
            #:generate-transitions
