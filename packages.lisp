@@ -124,6 +124,29 @@
 
            #:label #:out))
 
+(defpackage #:colander/parser
+  (:use #:cl
+        #:iterate
+
+        #:colander/code-generation
+        #:colander/dfa)
+  (:export #:identifier-char-p
+           #:short-opt-p
+           #:long-opt-t
+           #:combined-short-opt-p
+           #:single-opt-p
+           #:opt-p
+           #:included-arg-opt-p
+           #:included-arg
+           #:expand-short
+           #:maybe-expand
+           #:fully-expand-args
+           #:normalize-args
+
+           #:dfa-state-symbol
+           #:arg-parse-driver
+           #:dfa-state-declaim))
+
 (defpackage #:colander
   (:use #:cl
         #:iterate
