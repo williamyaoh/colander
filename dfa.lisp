@@ -107,6 +107,14 @@
   (with-slots (arg-t des-ts opt-ts dd-t accept-t)
       (reduce #'merge-transition-edge% (closure-outgoing-edges (slot-value node 'datum))
               :initial-value (make-instance 'intermediate-dfa-transitions%))
+
+    ;; We'll want more sophisticated error checking and useful messages later.
+    (when (cdr accept-t)
+      (warn "Accept/accept conflict at DFA state ~A." (slot-value node 'id)))
+    (flet ((nonempty-hash-table-p (hash-table) (not (zerop (hash-table-count hash-table)))))
+      (when (and (holdp accept-t) (or (holdp arg-t) (nonempty-hash-table-p des-ts)))
+        (warn "Shift/accept conflict at DFA state ~A." (slot-value node 'id))))
+
     `(,@(when (holdp accept-t) `((,accept-t :accept)))
       ,@(when (holdp dd-t) `((:double-dash ,(make-instance 'dfa-node :datum dd-t))))
       ,@(iter (for (des-string outs) in-hashtable des-ts)
