@@ -88,7 +88,7 @@
 (defun add-opt-t% (transitions leaving-node opt-spec out)
   (declare (ignorable leaving-node))
   (update (alexandria:curry #'add-state out)
-          (gethash (slot-value opt-spec 'short) ; Will need to be updated.
+          (gethash (slot-value opt-spec 'short) ; TODO: Will need to be updated.
                    (slot-value transitions 'opt-ts)
                    '()))
   transitions)
@@ -108,7 +108,7 @@
       (reduce #'merge-transition-edge% (closure-outgoing-edges (slot-value node 'datum))
               :initial-value (make-instance 'intermediate-dfa-transitions%))
 
-    ;; We'll want more sophisticated error checking and useful messages later.
+    ;; TODO: We'll want more sophisticated error checking and useful messages later.
     (when (cdr accept-t)
       (warn "Accept/accept conflict at DFA state ~A." (slot-value node 'id)))
     (flet ((nonempty-hash-table-p (hash-table) (not (zerop (hash-table-count hash-table)))))

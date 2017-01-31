@@ -22,8 +22,8 @@
   (string= (des-string obj1) (des-string obj2)))
 
 (defmethod similar-p ((obj1 opt-spec) (obj2 opt-spec))
-  ;; This will need to get rewritten after adding more functionality to
-  ;; our options.
+  ;; TODO: This will need to get rewritten after adding more functionality to
+  ;;       our options.
   (and (string= (opt-short obj1) (opt-short obj2))
        (not (alexandria:xor (opt-arg? obj1) (opt-arg? obj2)))))
 
