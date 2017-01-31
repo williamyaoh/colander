@@ -6,12 +6,10 @@
 
 (defun epsilon-closure (nfa-node)
   (with-slots (edges) nfa-node
-    (adjoin
-     nfa-node
-     (epsilon-closures (iter (for transition in edges)
-                             (with-slots (label out) transition
-                               (when (null label) (collecting out)))))
-     :test #'same-state-p)))
+    (add-state nfa-node
+               (epsilon-closures (iter (for transition in edges)
+                                       (with-slots (label out) transition
+                                         (when (null label) (collecting out))))))))
 
 (defun epsilon-closures (nfa-nodes)
   (when (holdp nfa-nodes)
@@ -20,6 +18,17 @@
        (union outs1 outs2 :test #'same-state-p))
      (map 'list #'epsilon-closure nfa-nodes)
      :initial-value '())))
+
+(defun closure-outgoing-edges (closure)
+  (alexandria:mappend
+   (lambda (nfa-node)
+     (iter (for transition in-vector (slot-value nfa-node 'edges))
+           (when (not (null (slot-value transition 'label)))
+             (collecting (list nfa-node transition)))))
+   closure))
+
+(defun add-state (nfa-node nfa-nodes)
+  (adjoin nfa-node nfa-nodes :test #'same-state-p))
 
 (defmethod initialize-node ((fa-node dfa-node) nfa)
   (declare (ignorable nfa))
@@ -32,6 +41,10 @@
    'dfa-node
    :datum (list (slot-value nfa 'root))))
 
+;; All slots, except ACCEPT-T, contain sets designating the set of NFA states,
+;; which the DFA state which the transition leads to will represent.
+;; ACCEPT-T represents the set of NFA states within the current DFA which have
+;; accept transitions.
 (defclass intermediate-dfa-transitions% ()
   ((arg-t :initarg :arg-t :initform '())
    (des-ts :initarg :des-ts :initform (make-hash-table :test 'equal))
@@ -42,53 +55,69 @@
 (defmacro update (fn place)
   `(setf ,place (funcall ,fn ,place)))
 
-(defun merge-transition-edge% (transitions transition)
-  (with-slots (label out) transition
-    (if (null label)
-        transitions
-        (funcall (etypecase label
-                   (arg-spec #'add-arg-t%)
-                   (des-spec #'add-des-t%)
-                   (opt-spec #'add-opt-t%)
-                   (keyword
-                    (ecase label
-                      (:double-dash #'add-dd-t%)
-                      (:accept #'add-accept-t%))))
-                 transitions
-                 label
-                 out))))
+(defun merge-transition-edge% (transitions transition-spec)
+  (destructuring-bind (nfa-node transition) transition-spec
+    (with-slots (label out) transition
+      (if (null label)
+          transitions
+          (funcall (etypecase label
+                     (arg-spec #'add-arg-t%)
+                     (des-spec #'add-des-t%)
+                     (opt-spec #'add-opt-t%)
+                     (keyword
+                      (ecase label
+                        (:double-dash #'add-dd-t%)
+                        (:accept #'add-accept-t%))))
+                   transitions
+                   nfa-node
+                   label
+                   out)))))
 
-(defun add-arg-t% (transitions arg-spec out)
-  (declare (ignorable arg-spec))
-  (update (lambda (nfa-nodes) (adjoin out nfa-nodes :test #'same-state-p))
+(defun add-arg-t% (transitions leaving-node arg-spec out)
+  (declare (ignorable leaving-node arg-spec))
+  (update (alexandria:curry #'add-state out)
           (slot-value transitions 'arg-t))
   transitions)
-(defun add-des-t% (transitions des-spec out)
-  ;; TODO
-  )
-(defun add-opt-t% (transitions opt-spec out)
-  ;; TODO
-  )
-(defun add-dd-t% (transitions double-dash out)
-  (declare (ignore double-dash))
-  (update (lambda (nfa-nodes) (adjoin out nfa-nodes :test #'same-state-p))
+(defun add-des-t% (transitions leaving-node des-spec out)
+  (declare (ignorable leaving-node))
+  (update (alexandria:curry #'add-state out)
+          (gethash (slot-value des-spec 'string)
+                   (slot-value transitions 'des-ts)
+                   '()))
+  transitions)
+(defun add-opt-t% (transitions leaving-node opt-spec out)
+  (declare (ignorable leaving-node))
+  (update (alexandria:curry #'add-state out)
+          (gethash (slot-value opt-spec 'short) ; Will need to be updated.
+                   (slot-value transitions 'opt-ts)
+                   '())))
+(defun add-dd-t% (transitions leaving-node double-dash out)
+  (declare (ignore leaving-node double-dash))
+  (update (alexandria:curry #'add-state out)
           (slot-value transitions 'dd-t))
   transitions)
-(defun add-accept-t% (transitions accept out)
-  (declare (ignore accept))
-  (update (lambda (nfa-nodes) (adjoin out nfa-nodes :test #'same-state-p))
+(defun add-accept-t% (transitions leaving-node accept out)
+  (declare (ignore accept out))
+  (update (alexandria:curry #'add-state leaving-node)
           (slot-value transitions 'accept-t))
   transitions)
 
 (defmethod generate-transitions ((node dfa-node) nfa)
-  ;; TODO: Probably gonna be pretty hard to pull this off.
   (with-slots (arg-t des-ts opt-ts dd-t accept-t)
-      (reduce #'merge-transition-edge% (slot-value node 'edges)
+      (reduce #'merge-transition-edge% (closure-outgoing-edges (slot-value node 'datum))
               :initial-value (make-instance 'intermediate-dfa-transitions%))
-    `(
-      ;; stuff here?
-      ))
-  )
+    `(,@(when (holdp accept-t) `((,accept-t :accept)))
+      ,@(when (holdp dd-t) `((:double-dash ,(make-instance 'dfa-node :datum dd-t))))
+      ,@(maphash (lambda (des-string outs)
+                   `(,(make-instance 'des-spec :string des-string)
+                     ,(make-instance 'dfa-node :datum outs)))
+                 des-ts)
+      ,@(when (holdp arg-t) `((,(make-instance 'arg-spec :name nil)
+                               ,(make-instance 'dfa-node :datum arg-t))))
+      ,@(maphash (lambda (opt-short outs)
+                   `(,(make-instance 'opt-spec :short opt-short :name nil)
+                     ,(make-instance 'dfa-node :datum outs)))
+                 opt-ts))))
 
 (defmethod same-state-p ((node1 dfa-node) (node2 dfa-node))
   (let ((nfa-states1 (slot-value node1 'datum))
