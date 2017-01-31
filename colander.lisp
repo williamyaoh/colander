@@ -127,7 +127,8 @@
 (defun item-prod (item prods)
   (aref prods (slot-value item 'prod-id)))
 (defun item-at-dot (item prods)
-  (nth (slot-value item 'dot) (item-prod item prods)))
+  (with-slots (cli-spec) (item-prod item prods)
+    (nth (slot-value item 'dot) cli-spec)))
 
 
 
@@ -149,12 +150,6 @@
 
 (defmethod generate-root-node ((fa-type (eql 'nfa)) prods)
   (make-instance 'nfa-start-node :datum prods))
-
-(defmethod generate-transitions :around (node seed)
-  (declare (ignore seed))
-  (format t "Generating transitions for: ~A~%" (slot-value node 'id))
-  (format t "Type: ~A~%" (type-of node))
-  (call-next-method))
 
 (defmethod generate-transitions ((node nfa-start-node) prods)
   (declare (ignore prods))
@@ -214,6 +209,13 @@
               (setf item (item-advance item)))
         next))))
 
-(defun cli-specs-to-nfa (cli-specs)
-  ;; CLI-SPECS :: (ARRAY * CLI-SPEC)
-  (generate-finite-automaton 'nfa cli-specs))
+(defun cli-specs-to-prods (cli-specs)
+  ;; CLI-SPECS :: (LIST CLI-SPEC)
+  (make-array (length cli-specs)
+              :initial-contents
+              (mapcar (lambda (cli-spec)
+                        (make-instance 'production :cli-spec cli-spec))
+                      cli-specs)))
+
+(defun prods-to-nfa (prods)
+  (generate-finite-automaton 'nfa prods))
