@@ -10,6 +10,9 @@
 (defmacro generate-and-load (code-name &rest args)
   (apply #'generate-code code-name args))
 
+(defun symb (&rest objs)
+  (intern (string-upcase (with-output-to-string (s) (format s "~{~A~}" objs)))))
+
 ;; We use REINTERN-TO-PACKAGE within the definition of DEFCODE below,
 ;; but we also need it in our output code.
 (eval-now

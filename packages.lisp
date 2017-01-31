@@ -32,6 +32,7 @@
   (:use #:cl
         #:colander/utils)
   (:export #:generate-code
+           #:symb
            #:reintern-to-package
 
            #:defcode
