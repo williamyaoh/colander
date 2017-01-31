@@ -59,6 +59,10 @@
            #:arg-name #:opt-arg-name
            #:many? #:opt-many?
 
+           #:arg-spec-load-form
+           #:des-spec-load-form
+           #:opt-spec-load-form
+
            ;; For testing purposes.
            #:normalize-spec%))
 
