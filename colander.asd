@@ -28,6 +28,12 @@
                                          "automata"
                                          "similar-p"
                                          "op-specs"))
+               (:file "dfa" :depends-on ("packages"
+                                         "utils"
+                                         "automata"
+                                         "similar-p"
+                                         "op-specs"
+                                         "nfa"))
                (:file "colander" :depends-on ("packages"
                                               "utils"
                                               "code-generation"

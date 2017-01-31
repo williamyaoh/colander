@@ -102,6 +102,20 @@
            #:nfa-opt-arg-parse-node #:opt-spec
            #:nfa-dd-node))
 
+(defpackage #:colander/dfa
+  (:use #:cl
+        #:iterate
+
+        #:colander/utils
+        #:colander/finite-automata
+        #:colander/similar-p
+        #:colander/op-specs
+        #:colander/nfa)
+  (:export #:nfa-to-dfa
+
+           #:dfa
+           #:dfa-node))
+
 (defpackage #:colander
   (:use #:cl
         #:iterate
@@ -110,4 +124,5 @@
         #:colander/code-generation
         #:colander/op-specs
         #:colander/finite-automata
-        #:colander/nfa))
+        #:colander/nfa
+        #:colander/dfa))
