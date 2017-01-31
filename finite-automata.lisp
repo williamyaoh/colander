@@ -17,8 +17,8 @@
 ;;; properly:
 ;;;   - GENERATE-ROOT-NODE
 ;;;   - GENERATE-TRANSITIONS
-;;;   - SAME-STATE
-;;; Additionally, :AROUND methods on INTERN-NODE can be used to do
+;;;   - SAME-STATE-P
+;;; Additionally, methods on INITIALIZE-NODE can be used to do
 ;;; initialization on newly-created nodes.
 
 ;;; NIL as an edge label represents an epsilon transition.
@@ -30,7 +30,7 @@
     the finite automata.")
   (:method (fa-type seed)
     (let* ((fa (make-instance fa-type))
-           (root-node (intern-node (generate-root-node fa-type seed) fa))
+           (root-node (intern-node (generate-root-node fa-type seed) fa seed))
            (computed (make-hash-table :test 'eql)))
       (with-slots (root) fa
         (setf root root-node)
@@ -45,16 +45,6 @@
 (defgeneric effect-transitions-recursively (fa-node fa seed computed)
   (:documentation
    "Recursively create all the states and transitions reachable from FA-NODE.")
-  (:method (fa-node fa seed computed)
-    (effect-transitions fa-node fa seed computed)
-    (with-slots (edges) fa-node
-      (iter (for edge in edges)
-            (with-slots (out) edge
-              (effect-transitions-recursively out fa seed computed))))))
-
-(defgeneric effect-transitions (fa-node fa seed computed)
-  (:documentation
-   "Add just the transitions at this node, to that node.")
   (:method :around (fa-node fa seed computed)
     (with-slots (id) fa-node
       (cond ((gethash id computed) nil)
@@ -62,6 +52,17 @@
              (setf (gethash id computed) t)
              (call-next-method)))))
   (:method (fa-node fa seed computed)
+    (effect-transitions fa-node fa seed)
+    (with-slots (edges) fa-node
+      (iter (for edge in edges)
+            (with-slots (out) edge
+              (unless (eq out 'accept)
+                (effect-transitions-recursively out fa seed computed)))))))
+
+(defgeneric effect-transitions (fa-node fa seed)
+  (:documentation
+   "Add just the transitions at this node, to that node.")
+  (:method (fa-node fa seed)
     (with-slots (edges) fa-node
       (iter (for (label out) in (generate-transitions fa-node seed))
             (push (make-instance
@@ -69,7 +70,7 @@
                    :label label
                    :out (if (eq out 'accept)
                             'accept
-                            (intern-node out fa)))
+                            (intern-node out fa seed)))
                   edges)))))
 
 (defgeneric generate-transitions (fa-node seed)
@@ -79,7 +80,16 @@
     and OUT is a node object representing the state that this transition leads
     to."))
 
-(defgeneric intern-node (fa-node fa)
+(defgeneric initialize-node (fa-node seed)
+  (:documentation
+   "Can be defined by a finite automata implementation. Performs initialization
+    on a node before passing it to INTERN-NODE to be added to the finite
+    automaton.")
+  (:method (fa-node seed)
+    (declare (ignore seed))
+    fa-node))
+
+(defgeneric intern-node (fa-node fa seed)
   (:documentation
    "Can be wrapped by a finite automata implementation. Checks to see if a node
     representing the same state already exists in the given finite automata,
@@ -87,10 +97,11 @@
 
     Given that there's no guarantee that a finite automata is acyclic, a correct
     implementation of SAME-STATE-P is crucial to avoid infinite loops.")
-  (:method (fa-node fa)
+  (:method (fa-node fa seed)
     (with-slots (nodes) fa
-      (let ((existing (iter (for fa-node* in-vector nodes)
-                            (finding fa-node* such-that (same-state-p fa-node fa-node*)))))
+      (let* ((fa-node (initialize-node fa-node seed))
+             (existing (iter (for fa-node* in-vector nodes)
+                             (finding fa-node* such-that (same-state-p fa-node fa-node*)))))
         (if existing
             existing
             (with-slots (id) fa-node

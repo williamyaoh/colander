@@ -24,7 +24,19 @@
 
            #:partial
 
-           #:slurp #:spit))
+           #:slurp #:spit
+
+           #:eval-now))
+
+(defpackage #:colander/code-generation
+  (:use #:cl
+        #:colander/utils)
+  (:export #:generate-code
+           #:reintern-to-package
+
+           #:defcode
+           #:defcode!
+           #:defcodefn!))
 
 (defpackage #:colander/finite-automata
   (:use #:cl
@@ -33,16 +45,17 @@
            #:edge #:label #:out
            #:finite-automaton #:root #:nodes
 
+           #:accept
+
            #:generate-finite-automaton
            #:generate-root-node
-           #:effect-transitions-recursively
-           #:effect-transitions
            #:generate-transitions
-           #:intern-node
+           #:initialize-node
            #:same-state-p))
 
 (defpackage #:colander
   (:use #:cl
         #:colander/utils
+        #:colander/code-generation
         #:colander/finite-automata
         #:iterate))

@@ -10,12 +10,15 @@
                 :components ((:file "slots")
                              (:file "lists")
                              (:file "composition")
-                             (:file "files")))
+                             (:file "files")
+                             (:file "evaluation")))
                (:module "sexps"
                 :components ((:static-file "argv.sexp")))
+               (:file "code-generation" :depends-on ("packages" "utils"))
                (:file "finite-automata" :depends-on ("packages"))
                (:file "colander" :depends-on ("packages"
                                               "utils"
+                                              "code-generation"
                                               "finite-automata"
                                               "sexps")))
   :in-order-to ((test-op (test-op "colander/test"))))
