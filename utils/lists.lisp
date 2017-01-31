@@ -66,19 +66,10 @@
     (segregate* list '() fns)))
 
 
-(defun mappend (fn seq &rest more-seqs)
-  (loop for list in (apply #'map 'list fn (cons seq more-seqs))
-        append list))
-
-
-(defun suffixes (list)
-  "All non-empty suffixes of LIST. Includes itself."
-  (loop for suffixes on list collect suffixes))
-
-
 (defun flatten (list)
-  (mappend (lambda (x) (if (listp x) (flatten x) (list x)))
-           list))
+  (alexandria:mappend
+   (lambda (x) (if (listp x) (flatten x) (list x)))
+   list))
 
 (defun group (n source)
   (if (zerop n) (error "zero length"))

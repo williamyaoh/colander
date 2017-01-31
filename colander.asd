@@ -5,11 +5,9 @@
   :depends-on ("iterate" "alexandria")
   :components ((:file "packages")
                (:module "utils"
-                :pathname ""
                 :depends-on ("packages")
                 :components ((:file "slots")
                              (:file "lists")
-                             (:file "composition")
                              (:file "files")
                              (:file "evaluation")))
                (:file "code-generation" :depends-on ("packages" "utils"))

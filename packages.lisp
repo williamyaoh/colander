@@ -13,16 +13,10 @@
            #:segregate-binary
            #:segregate
 
-           #:mappend
-
            #:suffixes
 
            #:flatten
            #:group
-
-           #:one-of #:all-of
-
-           #:partial
 
            #:slurp #:spit
 
