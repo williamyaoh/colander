@@ -93,8 +93,11 @@
   (:export #:cli-specs-to-prods
            #:prods-to-nfa
 
-           #:nfa
-           #:nfa-node
+           #:nfa #:root #:nodes
+           #:nfa-node #:id #:datum #:edges
+
+           #:label #:out
+
            #:nfa-start-node
            #:nfa-normal-node
            #:nfa-opt-arg-parse-node #:opt-spec
@@ -111,8 +114,10 @@
         #:colander/nfa)
   (:export #:nfa-to-dfa
 
-           #:dfa
-           #:dfa-node))
+           #:dfa #:root #:nodes
+           #:dfa-node #:id #:datum #:edges
+
+           #:label #:out))
 
 (defpackage #:colander
   (:use #:cl
