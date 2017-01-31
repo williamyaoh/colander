@@ -124,10 +124,10 @@
 (defun item-advance (item)
   (with-slots (dot prod-id) item
     (make-instance 'item :prod-id prod-id :dot (1+ dot))))
-(defun item-prod (item cli-specs)
-  (aref cli-specs (slot-value item 'prod-id)))
-(defun item-at-dot (item cli-specs)
-  (nth (slot-value item 'dot) (item-prod item cli-specs)))
+(defun item-prod (item prods)
+  (aref prods (slot-value item 'prod-id)))
+(defun item-at-dot (item prods)
+  (nth (slot-value item 'dot) (item-prod item prods)))
 
 
 
@@ -140,15 +140,15 @@
   ((opt-spec :initarg :opt-spec)))
 (defclass nfa-dd-node (nfa-node) ())
 
-(defun next-cli-spec (nfa-node cli-specs)
+(defun next-cli-spec (nfa-node prods)
   (with-slots ((item datum)) nfa-node
-    (item-at-dot item cli-specs)))
+    (item-at-dot item prods)))
 (defun node-advance (nfa-node)
   (with-slots ((item datum)) nfa-node
     (setf item (item-advance item))))
 
-(defmethod generate-root-node ((fa-type (eql 'nfa)) cli-specs)
-  (make-instance 'nfa-start-node :datum cli-specs))
+(defmethod generate-root-node ((fa-type (eql 'nfa)) prods)
+  (make-instance 'nfa-start-node :datum prods))
 
 (defmethod generate-transitions :around (node seed)
   (declare (ignore seed))
@@ -156,10 +156,10 @@
   (format t "Type: ~A~%" (type-of node))
   (call-next-method))
 
-(defmethod generate-transitions ((node nfa-start-node) cli-specs)
-  (declare (ignore cli-specs))
-  (with-slots ((cli-specs datum)) node
-    (iter (for i index-of-vector cli-specs)
+(defmethod generate-transitions ((node nfa-start-node) prods)
+  (declare (ignore prods))
+  (with-slots ((prods datum)) node
+    (iter (for i index-of-vector prods)
           (collecting `(nil ,(make-instance
                               'nfa-normal-node
                               :datum (make-instance
@@ -167,10 +167,10 @@
                                       :prod-id i
                                       :dot 0)))))))
 
-(defmethod generate-transitions ((node nfa-normal-node) cli-specs)
+(defmethod generate-transitions ((node nfa-normal-node) prods)
   (with-slots ((item datum)) node
     `((double-dash ,(make-instance 'nfa-dd-node :datum item))
-      ,@(let ((next (next-cli-spec node cli-specs)))
+      ,@(let ((next (next-cli-spec node prods)))
           (etypecase next
             (arg-spec `((,next ,(make-instance 'nfa-normal-node :datum (item-advance item)))))
             (des-spec `((,next ,(make-instance 'nfa-normal-node :datum (item-advance item)))))
@@ -184,14 +184,14 @@
                                                           :opt-spec opt-spec
                                                           :datum item))))))))))))
 
-(defmethod generate-transitions ((node nfa-opt-arg-parse-node) cli-specs)
-  (declare (ignore cli-specs))
+(defmethod generate-transitions ((node nfa-opt-arg-parse-node) prods)
+  (declare (ignore prods))
   (with-slots ((previous datum) opt-spec) node
     (list `(,(make-instance 'arg-spec :name (opt-arg-name opt-spec))
             ,(make-instance 'nfa-normal-node :datum previous)))))
 
-(defmethod generate-transitions ((node nfa-dd-node) cli-specs)
-  (let ((next (next-cli-spec node cli-specs)))
+(defmethod generate-transitions ((node nfa-dd-node) prods)
+  (let ((next (next-cli-spec node prods)))
     (list (with-slots ((item datum)) node
             (etypecase next
               (arg-spec `(,next ,(make-instance 'nfa-dd-node :datum (item-advance item))))
@@ -206,11 +206,11 @@
 (defmethod same-state-p ((node1 nfa-dd-node) (node2 nfa-dd-node))
   (similar-p (slot-value node1 'datum) (slot-value node2 'datum)))
 
-(defmethod initialize-node ((fa-node nfa-dd-node) cli-specs)
+(defmethod initialize-node ((fa-node nfa-dd-node) prods)
   (with-slots ((item datum)) fa-node
     (let ((next (make-instance 'nfa-dd-node :datum item)))
       (with-slots ((item datum)) next
-        (iter (while (consp (next-cli-spec next cli-specs)))
+        (iter (while (consp (next-cli-spec next prods)))
               (setf item (item-advance item)))
         next))))
 
