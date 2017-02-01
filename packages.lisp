@@ -139,7 +139,15 @@
 
            #:dfa-state-symbol
            #:arg-parse-driver
-           #:dfa-state-declaim))
+           #:dfa-state-declaim
+
+           #:parse-state
+           #:parse-cli-spec
+           #:normalize-parse-state
+           #:delegate-parse-state-transformer
+           #:parse-arg-state
+           #:parse-des-state
+           #:parse-opt-state))
 
 (defpackage #:colander
   (:use #:cl

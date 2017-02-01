@@ -99,3 +99,78 @@
 ;; undeclared functions in our mutual recursion.
 (defcode dfa-state-declaim (dfa-node)
   `(declaim (ftype function ,(generate-code 'dfa-state-symbol dfa-node))))
+
+;; Our actual parser! Surprisingly simple, since we don't need any error-checking;
+;; that's all been handled by running our tokens through our DFA.
+
+(defcode parse-state ()
+  `(defclass parse-state ()
+     ((tokens :initarg :tokens :accessor parse-tokens)
+      (specs :initarg :specs :accessor parse-specs)
+      (parsed :initarg :parsed :initform '()  :accessor parse-parsed)
+      (dd? :initarg :dd? :initform nil :accessor parse-dd?))))
+
+(defcode parse-cli-spec ()
+  `(defun parse-cli-spec (tokens spec)
+     (loop with state = (make-instance 'parse-state :tokens tokens :specs spec)
+           while (consp (parse-specs state))
+           do (setf state (delegate-parse-state-transformer state))
+           finally (return (nreverse (parse-parsed state))))))
+
+(defcode normalize-parse-state ()
+  `(defun normalize-parse-state (parse-state)
+     (cond
+       ((and (parse-dd? parse-state) (listp (first (parse-specs parse-state))))
+        (setf (parse-specs parse-state) (rest (parse-specs parse-state)))
+        parse-state)
+       (:otherwise parse-state))))
+
+(defcode delegate-parse-state-transformer ()
+  `(defun delegate-parse-state-transformer (parse-state)
+     (when (and (not (parse-dd? parse-state))
+                (string= "--" (first (parse-tokens parse-state))))
+       (setf (parse-tokens parse-state) (rest (parse-tokens parse-state)))
+       (setf (parse-dd? parse-state) t))
+     (let ((parse-state (normalize-parse-state parse-state)))
+       (funcall (etypecase (first (parse-specs parse-state))
+                  (arg-spec #'parse-arg-state)
+                  (des-spec #'parse-des-state)
+                  (cons #'parse-opt-state))
+                parse-state))))
+
+(defcode parse-arg-state ()
+  `(defun parse-arg-state (parse-state)
+     (let ((arg-spec (pop (parse-spec parse-state)))
+           (token (pop (parse-tokens parse-state))))
+       (push (list (arg-name arg-spec) token)
+             (parse-parsed parse-state))
+       parse-state)))
+
+(defcode parse-des-state ()
+  `(defun parse-des-state (parse-state)
+     (let ((des-spec (pop (parse-spec parse-state)))
+           (token (pop (parse-tokens parse-state))))
+       (declare (ignorable des-spec token))
+       parse-state)))
+
+(defcode parse-opt-state ()
+  `(defun parse-opt-state (parse-state)
+     (let ((opt-specs (first (parse-spec parse-state)))
+           (token (pop (parse-tokens parse-state))))
+       (cond
+         ((not (or (short-opt-p token) (long-opt-p token)))
+          (pop (parse-spec parse-state))
+          (push token (parse-tokens parse-state))
+          (delegate-parse-state-transformer parse-state))
+         (:otherwise
+          ;; TODO: More than just the short option name.
+          (let ((opt-spec (find token opt-specs :test #'string= :key #'opt-short)))
+            (cond
+              ((opt-arg? opt-spec)
+               (push (make-instance 'arg-spec :name (opt-short opt-spec))
+                     (parse-specs parse-state))
+               parse-state)
+              (:otherwise
+               (push (list (opt-short opt-spec) t)
+                     (parse-parsed parse-state))
+               parse-state))))))))
