@@ -2,6 +2,8 @@
 
 (defun holdp (list) (not (null list)))
 
+(defun singlep (list) (and (not (cdr list)) list))
+
 
 (defun take (n list)
   "Collect N elements from the front of LIST. Second return value is the

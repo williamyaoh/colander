@@ -85,12 +85,26 @@
 
 ;;; Code specific to the generated parsers.
 
+(defcode prod-symbol (prod-id)
+  (symb "prod" prod-id))
+
+(defcode prod (prod prod-id)
+  `(defparameter ,(generate-code 'prod-symbol prod-id)
+     (list ,@(mapcar (lambda (obj) (if (listp obj) (cons 'list obj) obj))
+                     (slot-value prod 'cli-spec)))))
+
+(defcode prods (prods)
+  `(progn
+     ,@(iter (for id index-of-vector prods)
+             (for prod in-vector prods)
+             (collecting (generate-code 'prod prod id)))))
+
 (defcode dfa-state-symbol (dfa-node)
   (symb "state" (slot-value dfa-node 'id)))
 
 (defcode arg-parse-driver (dfa)
   `(defun arg-parse-driver (tokens)
-     (let ((state (function ,(generate-code 'dfa-state-symbol (dfa-root dfa)))))
+     (let ((state (function ,(generate-code 'dfa-state-symbol (slot-value dfa 'root)))))
        (dolist (token tokens)
          (setf state (funcall state token)))
        (funcall state nil))))
@@ -99,6 +113,47 @@
 ;; undeclared functions in our mutual recursion.
 (defcode dfa-state-declaim (dfa-node)
   `(declaim (ftype function ,(generate-code 'dfa-state-symbol dfa-node))))
+
+;; ACCEPT transitions.
+(defmethod generate-code ((states list) &rest args)
+  (destructuring-bind (out) args
+    (declare (ignorable out))
+    `((null token)
+      ,(if (not (singlep states))
+           `(error "Accept/accept conflict. Parse failure.")
+           (generate-code 'prod-symbol (slot-value (slot-value (car states) 'datum) 'prod-id))))))
+
+(defmethod generate-code ((code-name (eql :double-dash)) &rest args)
+  (destructuring-bind (out) args
+    `((string= "--" token)
+      (function ,(generate-code 'dfa-state-symbol out)))))
+
+(defmethod generate-code ((code-name arg-spec) &rest args)
+  (declare (ignorable code-name))
+  (destructuring-bind (out) args
+    `((not (or (short-opt-p token) (long-opt-p token)))
+      (function ,(generate-code 'dfa-state-symbol out)))))
+
+(defmethod generate-code ((code-name des-spec) &rest args)
+  (destructuring-bind (out) args
+    `((string= token ,(des-string code-name))
+      (function ,(generate-code 'dfa-state-symbol out)))))
+
+(defmethod generate-code ((code-name opt-spec) &rest args)
+  (destructuring-bind (out) args
+    ;; TODO: More than just short opt strings.
+    `((and (or (short-opt-p token) (long-opt-p token))
+           (string= token ,(opt-short code-name)))
+      (function ,(generate-code 'dfa-state-symbol out)))))
+
+(defcode dfa-state (dfa-node)
+  `(defun ,(generate-code 'dfa-state-symbol dfa-node) (token)
+     (cond
+       ,@(iter (for transition in (slot-value dfa-node 'edges))
+               (with-slots (label out) transition
+                 (collecting (generate-code label out))))
+       (:otherwise
+        (error "No transition for ~S from state ~A." token ,(slot-value dfa-node 'id))))))
 
 ;; Our actual parser! Surprisingly simple, since we don't need any error-checking;
 ;; that's all been handled by running our tokens through our DFA.

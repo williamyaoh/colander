@@ -9,7 +9,7 @@
      ((string :accessor des-string :initarg :string))))
 (defcode! opt-spec
   `(defclass opt-spec ()
-     ((name :accessor opt-name :initarg :name)
+     ((name :accessor opt-name :initarg :name :initform nil)
       (short :accessor opt-short :initarg :short)
       (arg? :accessor opt-arg? :initarg :arg? :initform nil)
       (arg-name :accessor opt-arg-name :initarg :arg-name :initform nil)

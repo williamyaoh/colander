@@ -61,6 +61,12 @@
                                          "similar-p"
                                          "op-specs"
                                          "nfa"))
+               (:file "parser" :depends-on ("packages"
+                                            "utils"
+                                            "op-specs"
+                                            "automata"
+                                            "code-generation"
+                                            "dfa"))
                (:file "colander" :depends-on ("packages"
                                               "utils"
                                               "code-generation"

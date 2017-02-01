@@ -6,6 +6,7 @@
   (:export #:with-nested-slots
 
            #:holdp
+           #:singlep
 
            #:take #:take-if
            #:drop #:drop-if
@@ -122,6 +123,9 @@
   (:use #:cl
         #:iterate
 
+        #:colander/utils
+        #:colander/op-specs
+        #:colander/finite-automata
         #:colander/code-generation
         #:colander/dfa)
   (:export #:identifier-char-p
@@ -137,9 +141,11 @@
            #:fully-expand-args
            #:normalize-args
 
-           #:dfa-state-symbol
+           #:prods
+
            #:arg-parse-driver
            #:dfa-state-declaim
+           #:dfa-state
 
            #:parse-state
            #:parse-cli-spec
@@ -158,4 +164,5 @@
         #:colander/op-specs
         #:colander/finite-automata
         #:colander/nfa
-        #:colander/dfa))
+        #:colander/dfa
+        #:colander/parser))
