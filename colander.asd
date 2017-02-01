@@ -30,7 +30,7 @@
 (defsystem #:colander
   :author "William Yao <williamyaoh@gmail.com>"
   :maintainer "William Yao <williamyaoh@gmail.com>"
-  :version "0.0.1"
+  :version "0.1.0"
   :depends-on ("iterate" "alexandria")
   :components ((:file "packages")
                (:module "utils"
