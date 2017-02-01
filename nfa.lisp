@@ -69,9 +69,9 @@
             (null `((:accept :accept)))
             (cons `((nil ,(make-instance 'nfa-normal-node :datum (item-advance item)))
                     ,@(iter (for opt-spec in next)
-                            (if (not (opt-arg? opt-spec))
-                                (collecting `(,opt-spec ,node))
-                                (collecting `(,opt-spec ,(make-instance
+                            (collecting `(,opt-spec ,(if (not (opt-arg? opt-spec))
+                                                         node
+                                                         (make-instance
                                                           'nfa-opt-arg-parse-node
                                                           :opt-spec opt-spec
                                                           :datum item))))))))))))
