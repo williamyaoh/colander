@@ -30,7 +30,7 @@ CL-USER> (colander:output-parser-to-file% parser "cli-parser.lisp")
 ```
 
 ```lisp
-;; <in "cli-parser-lisp">
+;; <in "cli-parser.lisp">
 
 (defun main (argv)
   (format t "~A~%" (colander-parser:parse argv)))
