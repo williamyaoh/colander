@@ -2,7 +2,9 @@
 
 (defun generate-parser-forms (dfa prods &optional (package *package*))
   (let ((*package* package)
-        (noarg-code '(identifier-char-p
+        (noarg-code '(arg-spec des-spec opt-spec
+
+                      identifier-char-p
                       short-opt-p long-opt-p
                       combined-short-opt-p single-opt-p
                       opt-p
@@ -10,11 +12,13 @@
                       expand-short maybe-expand fully-expand-args
                       normalize-args
 
+                      parsing-function-declaims
+
                       parse-state
-                      parse-cli-spec
                       normalize-parse-state
-                      delegate-parse-state-transformer
                       parse-arg-state parse-des-state parse-opt-state
+                      delegate-parse-state-transformer
+                      parse-cli-spec
 
                       parse)))
     `(,@(iter (for symbol in noarg-code) (collecting (generate-code symbol)))
@@ -36,21 +40,28 @@
   ;; We do the form generation in one package, and the printing in another.
   ;; We don't want FORMAT to print symbols while it itself is in the parser's
   ;; package.
-  (let ((forms (let ((*package* (make-package "COLANDER-PARSER" :use '(#:cl))))
-                 `((defpackage #:colander-parser
-                     (:use #:cl)
-                     (:export #:parse))
-                   ,(reintern-to-package `(defvar old-package))
-                   ,(reintern-to-package `(eval-when (:compile-toplevel :load-toplevel :execute)
-                                            (setf old-package *package*)))
-                   ,(reintern-to-package `(in-package #:colander/parser))
-                   ;; We don't want to disturb any other code in the other file,
-                   ;; so we surround our parser with package-defining code.
-                   ,@(generate-parser-forms dfa prods)
-                   ,(reintern-to-package `(eval-when (:compile-toplevel :load-toplevel :execute)
-                                            (setf *package* old-package)))))))
-    (prog1 (with-output-to-string (out)
-             (let ((*package* (make-package "COLANDER/BLANK" :use '())))
-               (format out "~{~S~^~%~}" forms)))
-      (delete-package "COLANDER-PARSER")
+  (unwind-protect
+       (let ((forms (let ((*package* (make-package "COLANDER-PARSER" :use '(#:cl))))
+                      `((defpackage #:colander-parser
+                          (:use #:cl)
+                          (:export #:parse))
+                        ,(reintern-to-package `(defvar old-package))
+                        ,(reintern-to-package `(eval-when (:compile-toplevel :load-toplevel :execute)
+                                                 (setf old-package *package*)))
+                        ,(reintern-to-package `(in-package #:colander-parser))
+                        ;; We don't want to disturb any other code in the other file,
+                        ;; so we surround our parser with package-defining code.
+                        ,(slurp #p"sexps/argv.sexp")
+                        ,@(generate-parser-forms dfa prods)
+                        ,(reintern-to-package `(eval-when (:compile-toplevel :load-toplevel :execute)
+                                                 (setf *package* old-package)))))))
+         (with-output-to-string (out)
+           (let ((*package* (make-package "COLANDER/BLANK" :use '())))
+             (iter (for form in forms)
+                   (if (stringp form)
+                       (format out "~A~&" form)
+                       (format out "~S~&" form))))))
+    (when (find-package "COLANDER-PARSER")
+      (delete-package "COLANDER-PARSER"))
+    (when (find-package "COLANDER/BLANK")
       (delete-package "COLANDER/BLANK"))))

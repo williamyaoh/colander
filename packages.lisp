@@ -149,6 +149,7 @@
 
            #:parse-state
            #:parse-cli-spec
+           #:parsing-function-declaims
            #:normalize-parse-state
            #:delegate-parse-state-transformer
            #:parse-arg-state

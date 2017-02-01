@@ -179,6 +179,9 @@
         parse-state)
        (:otherwise parse-state))))
 
+(defcode parsing-function-declaims ()
+  `(declaim (ftype function arg-parse-driver)))
+
 (defcode delegate-parse-state-transformer ()
   `(defun delegate-parse-state-transformer (parse-state)
      (when (and (not (parse-dd? parse-state))
@@ -194,7 +197,7 @@
 
 (defcode parse-arg-state ()
   `(defun parse-arg-state (parse-state)
-     (let ((arg-spec (pop (parse-spec parse-state)))
+     (let ((arg-spec (pop (parse-specs parse-state)))
            (token (pop (parse-tokens parse-state))))
        (push (list (arg-name arg-spec) token)
              (parse-parsed parse-state))
@@ -202,20 +205,20 @@
 
 (defcode parse-des-state ()
   `(defun parse-des-state (parse-state)
-     (let ((des-spec (pop (parse-spec parse-state)))
+     (let ((des-spec (pop (parse-specs parse-state)))
            (token (pop (parse-tokens parse-state))))
        (declare (ignorable des-spec token))
        parse-state)))
 
 (defcode parse-opt-state ()
   `(defun parse-opt-state (parse-state)
-     (let ((opt-specs (first (parse-spec parse-state)))
+     (let ((opt-specs (first (parse-specs parse-state)))
            (token (pop (parse-tokens parse-state))))
        (cond
          ((not (or (short-opt-p token) (long-opt-p token)))
-          (pop (parse-spec parse-state))
+          (pop (parse-specs parse-state))
           (push token (parse-tokens parse-state))
-          (delegate-parse-state-transformer parse-state))
+          parse-state)
          (:otherwise
           ;; TODO: More than just the short option name.
           (let ((opt-spec (find token opt-specs :test #'string= :key #'opt-short)))
