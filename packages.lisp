@@ -20,6 +20,7 @@
            #:group
 
            #:slurp #:spit
+           #:relative-pathname
 
            #:eval-now))
 
@@ -163,9 +164,10 @@
         #:iterate
 
         #:colander/utils
-        #:colander/code-generation
         #:colander/op-specs
-        #:colander/finite-automata
+        #:colander/code-generation
         #:colander/nfa
         #:colander/dfa
-        #:colander/parser))
+        #:colander/parser)
+  (:export #:cli-specs-to-parser%
+           #:output-parser-to-file%))

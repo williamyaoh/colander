@@ -51,7 +51,7 @@
                         ,(reintern-to-package `(in-package #:colander-parser))
                         ;; We don't want to disturb any other code in the other file,
                         ;; so we surround our parser with package-defining code.
-                        ,(slurp #p"sexps/argv.sexp")
+                        ,(slurp (relative-pathname "sexps/argv.sexp"))
                         ,@(generate-parser-forms dfa prods)
                         ,(reintern-to-package `(eval-when (:compile-toplevel :load-toplevel :execute)
                                                  (setf *package* old-package)))))))
@@ -65,3 +65,21 @@
       (delete-package "COLANDER-PARSER"))
     (when (find-package "COLANDER/BLANK")
       (delete-package "COLANDER/BLANK"))))
+
+
+;;; Some temporary testing functions.
+
+(defun cli-specs-to-parser% (&rest cli-specs)
+  (let* ((prods (cli-specs-to-prods (map 'list #'normalize-spec% cli-specs)))
+         (nfa (prods-to-nfa prods))
+         (dfa (nfa-to-dfa nfa)))
+    (list dfa prods)))
+
+(defun output-parser-to-file% (parser filename)
+  (destructuring-bind (dfa prods) parser
+    (with-open-file (out filename
+                         :direction :output
+                         :if-does-not-exist :create
+                         :if-exists :overwrite)
+      (write-string (generate-copyable-parser dfa prods)
+                    out))))

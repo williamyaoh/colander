@@ -18,3 +18,6 @@
                           :if-does-not-exist :create
                           :if-exists (if append? :append :overwrite))
     (write-string string output)))
+
+(defun relative-pathname (filename)
+  (asdf:system-relative-pathname '#:colander filename))
