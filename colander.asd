@@ -31,6 +31,7 @@
   :author "William Yao <williamyaoh@gmail.com>"
   :maintainer "William Yao <williamyaoh@gmail.com>"
   :version "0.1.0"
+  :license "BSD-3"
   :depends-on ("iterate" "alexandria")
   :components ((:file "packages")
                (:module "utils"
