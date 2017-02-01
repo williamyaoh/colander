@@ -130,7 +130,7 @@
         #:colander/dfa)
   (:export #:identifier-char-p
            #:short-opt-p
-           #:long-opt-t
+           #:long-opt-p
            #:combined-short-opt-p
            #:single-opt-p
            #:opt-p
@@ -153,7 +153,9 @@
            #:delegate-parse-state-transformer
            #:parse-arg-state
            #:parse-des-state
-           #:parse-opt-state))
+           #:parse-opt-state
+
+           #:parse))
 
 (defpackage #:colander
   (:use #:cl

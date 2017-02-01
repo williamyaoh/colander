@@ -94,10 +94,9 @@
                      (slot-value prod 'cli-spec)))))
 
 (defcode prods (prods)
-  `(progn
-     ,@(iter (for id index-of-vector prods)
-             (for prod in-vector prods)
-             (collecting (generate-code 'prod prod id)))))
+  (iter (for id index-of-vector prods)
+        (for prod in-vector prods)
+        (collecting (generate-code 'prod prod id))))
 
 (defcode dfa-state-symbol (dfa-node)
   (symb "state" (slot-value dfa-node 'id)))
@@ -229,3 +228,8 @@
                (push (list (opt-short opt-spec) t)
                      (parse-parsed parse-state))
                parse-state))))))))
+
+(defcode parse ()
+  `(defun parse (&optional (tokens (cdr (argv))))
+     (let ((tokens (normalize-args tokens)))
+       (parse-cli-spec tokens (arg-parse-driver tokens)))))
