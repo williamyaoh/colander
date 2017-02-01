@@ -80,6 +80,6 @@
     (with-open-file (out filename
                          :direction :output
                          :if-does-not-exist :create
-                         :if-exists :overwrite)
+                         :if-exists :supersede)
       (write-string (generate-copyable-parser dfa prods)
                     out))))

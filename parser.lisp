@@ -130,7 +130,7 @@
 (defmethod generate-code ((code-name arg-spec) &rest args)
   (declare (ignorable code-name))
   (destructuring-bind (out) args
-    `((not (or (short-opt-p token) (long-opt-p token)))
+    `((not (or (short-opt-p token) (long-opt-p token) (string= token "--")))
       (function ,(generate-code 'dfa-state-symbol out)))))
 
 (defmethod generate-code ((code-name des-spec) &rest args)
