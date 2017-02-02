@@ -51,6 +51,10 @@
            #:slurp #:spit
            #:relative-pathname
 
+           #:lines #:unlines
+           #:trim-comment #:trim-trailing-whitespace
+           #:squish-invisibles
+
            #:eval-now))
 
 (defpackage #:colander/code-generation

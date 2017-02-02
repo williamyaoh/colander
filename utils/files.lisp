@@ -50,3 +50,38 @@
 
 (defun relative-pathname (filename)
   (asdf:system-relative-pathname '#:colander filename))
+
+(defun lines (input)
+  "If INPUT is a string, return a list of its lines. If INPUT is a STREAM,
+   read all its lines into a list."
+  (with-open-stream (*standard-input*
+                     (if (streamp input)
+                         input
+                         (make-string-input-stream input)))
+    (iter (for line = (read-line *standard-input* nil nil))
+          (while line)
+          (collecting line))))
+
+(defun unlines (lines)
+  "Concatenate all the lines together into a string, with newlines in between
+   them. Has a trailing newline."
+  (format nil "~{~A~%~}" lines))
+
+(defun trim-comment (line)
+  (let ((semicolon (position #\; line)))
+    (if semicolon
+        (subseq line 0 semicolon)
+        line)))
+
+(defun trim-trailing-whitespace (line)
+  (string-right-trim
+   #.(format nil "~{~C~}" (mapcar #'code-char '(#x09 #x0A #x0B #x0C #x0D #x20)))
+   line))
+
+(defun squish-invisibles (input)
+  "Squish together empty lines and comments in Lisp-ish files."
+  (unlines
+   (remove-if
+    (lambda (line) (zerop (length line)))
+    (mapcar (lambda (line) (trim-trailing-whitespace (trim-comment line)))
+            (lines input)))))

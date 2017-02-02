@@ -80,7 +80,7 @@
                         ,(reintern-to-package `(in-package #:colander-parser))
                         ;; We don't want to disturb any other code in the other file,
                         ;; so we surround our parser with package-defining code.
-                        ,(slurp (relative-pathname "sexps/argv.sexp"))
+                        ,(squish-invisibles (slurp (relative-pathname "sexps/argv.sexp")))
                         ,@(generate-parser-forms dfa prods)
                         ,(reintern-to-package `(eval-when (:compile-toplevel :load-toplevel :execute)
                                                  (setf *package* old-package)))))))
