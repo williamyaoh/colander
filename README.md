@@ -1,4 +1,4 @@
-# COLANDER [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
+# COLANDER [![License](https://img.shields.io/badge/license-BSD--3-ff69b4.svg)](https://github.com/williamyaoh/colander/blob/master/LICENSE)
 
 Copyright (c) 2017 William Yao
 
