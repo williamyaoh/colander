@@ -95,6 +95,13 @@
     (when (find-package "COLANDER/BLANK")
       (delete-package "COLANDER/BLANK"))))
 
+(defmacro define-parser (dfa prods)
+  `(progn
+     (eval (generate-parser-forms ,dfa ,prods))
+     (eval (generate-code 'arg-spec-load-form))
+     (eval (generate-code 'des-spec-load-form))
+     (eval (generate-code 'opt-spec-load-form))))
+
 
 ;;; Some temporary testing functions.
 
